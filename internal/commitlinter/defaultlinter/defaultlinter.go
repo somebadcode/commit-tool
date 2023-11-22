@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commitlint/internal/commitlinter"
-	"github.com/somebadcode/commitlint/internal/commitmsg"
+	"github.com/somebadcode/conventional-commits-tool/internal/commitlinter"
+	"github.com/somebadcode/conventional-commits-tool/internal/commitmsg"
 )
 
 type Linter struct {

@@ -8,9 +8,9 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/somebadcode/commitlint/internal/commitlinter"
-	"github.com/somebadcode/commitlint/internal/commitlinter/defaultlinter"
-	"github.com/somebadcode/commitlint/internal/repobuilder"
+	"github.com/somebadcode/conventional-commits-tool/internal/commitlinter"
+	"github.com/somebadcode/conventional-commits-tool/internal/commitlinter/defaultlinter"
+	"github.com/somebadcode/conventional-commits-tool/internal/repobuilder"
 )
 
 func TestLinter_Lint(t *testing.T) {
