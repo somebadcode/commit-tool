@@ -52,7 +52,7 @@ func Run(ctx context.Context) int {
 	}
 
 	app := &cli.App{
-		Name:      "conventional-commits-tool",
+		Name:      "commits-tool",
 		Copyright: CopyrightNotice,
 		Version:   buildInfo.Main.Version,
 		Commands: []*cli.Command{
