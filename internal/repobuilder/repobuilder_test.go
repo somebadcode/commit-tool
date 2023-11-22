@@ -7,7 +7,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commitlint/internal/repobuilder"
+	"github.com/somebadcode/conventional-commits-tool/internal/repobuilder"
 )
 
 func ExampleBuild() {

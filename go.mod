@@ -1,4 +1,4 @@
-module github.com/somebadcode/commitlint
+module github.com/somebadcode/conventional-commits-tool
 
 go 1.21
 
