@@ -11,9 +11,10 @@ import (
 )
 
 type Linter struct {
-	// AllowInitialCommit will ignore initial commit
+	// AllowInitialCommit will cause the linter to ignore initial commit if it's written correctly.
 	AllowInitialCommit bool
-	AllowedTypes       map[string]struct{}
+	// AllowedTypes is a set of commit types that should be allowed. Defaults to conventional commits and angular types.
+	AllowedTypes map[string]struct{}
 }
 
 var (
