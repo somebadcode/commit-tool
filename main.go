@@ -4,17 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"os"
-	"runtime/debug"
 )
 
-//go:embed LICENSE.txt
-var License string
+// //go:embed LICENSE
+// var License string
+
+//go:embed NOTICE
+var CopyrightNotice string
 
 func main() {
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
-		buildInfo = &debug.BuildInfo{}
-	}
-
-	os.Exit(Run(context.Background(), buildInfo))
+	os.Exit(Run(context.Background()))
 }

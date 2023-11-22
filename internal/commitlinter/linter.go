@@ -11,18 +11,20 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 )
 
+type ReportFunc func(err error)
+type StopFunc func(commit *object.Commit) bool
+
 type Linter interface {
 	Lint(commit *object.Commit) error
 }
-
-type ReportFunc func(err error)
-type StopFunc func(commit *object.Commit) bool
 
 type CommitLinter struct {
 	// Repo is the repository whose commits should be linted.
 	Repo *git.Repository
 	// Rev is the start of the linter. Defaults to HEAD.
 	Rev plumbing.Revision
+	// UntilRev is the revision where the linter will stop. Will only work if StopFunc is nil.
+	UntilRev plumbing.Revision
 	// ReportFunc is called after each call to Linter if it returned an error.
 	ReportFunc ReportFunc
 	// Linter is called for each commit.
@@ -46,6 +48,17 @@ func setDefaults(l *CommitLinter) error {
 
 	if l.ReportFunc == nil {
 		l.ReportFunc = NoReporting
+	}
+
+	if l.UntilRev != "" && l.StopFunc == nil {
+		hash, err := l.Repo.ResolveRevision(l.UntilRev)
+		if err != nil {
+			return fmt.Errorf("bad stop revision: %w", err)
+		}
+
+		l.StopFunc = func(commit *object.Commit) bool {
+			return commit.Hash == *hash
+		}
 	}
 
 	if l.StopFunc == nil {
