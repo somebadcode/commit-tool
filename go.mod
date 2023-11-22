@@ -1,4 +1,4 @@
-module github.com/somebadcode/conventional-commits-tool
+module github.com/somebadcode/commit-tool
 
 go 1.21
 
