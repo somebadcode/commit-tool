@@ -50,14 +50,14 @@ func failParsing(p *parser, err error) stateFunc {
 }
 
 func parseRevertOrMerge(p *parser) stateFunc {
-	if strings.HasPrefix(p.msg, "Merge \"") {
-		p.commit.Merge = true
-		p.acceptUntil("\"")
-	} else if strings.HasPrefix(p.msg, "Revert \"") {
-		p.commit.Revert = true
-		p.acceptUntil("\"")
-	}
-
+	/*	if strings.HasPrefix(p.msg, "Merge \"") {
+			p.commit.Merge = true
+			p.acceptUntil("\"")
+		} else if strings.HasPrefix(p.msg, "Revert \"") {
+			p.commit.Revert = true
+			p.acceptUntil("\"")
+		}
+	*/
 	return parseType
 }
 

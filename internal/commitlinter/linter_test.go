@@ -27,6 +27,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 
 	type fields struct {
 		Rev        plumbing.Revision
+		UntilRev   plumbing.Revision
 		ReportFunc commitlinter.ReportFunc
 		StopFunc   commitlinter.StopFunc
 		Linter     commitlinter.Linter
@@ -90,6 +91,18 @@ func TestCommitLinter_Lint(t *testing.T) {
 				StopFunc: commitlinter.StopAfterN(1),
 			},
 		},
+		{
+			name: "UntilRev",
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("bad commit", commitOpts),
+				repobuilder.Commit("fix: bug #1", commitOpts),
+				repobuilder.Commit("feat: add foo", commitOpts),
+			},
+			fields: fields{
+				Linter:   defaultlinter.New(),
+				UntilRev: "main",
+			},
+		},
 	}
 
 	t.Parallel()
@@ -108,6 +121,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 			l := &commitlinter.CommitLinter{
 				Repo:       repo,
 				Rev:        tt.fields.Rev,
+				UntilRev:   tt.fields.UntilRev,
 				ReportFunc: tt.fields.ReportFunc,
 				StopFunc:   tt.fields.StopFunc,
 				Linter:     tt.fields.Linter,

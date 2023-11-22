@@ -25,21 +25,21 @@ var (
 	angularCommitTypes      = []string{"docs", "ci", "chore", "style", "refactor", "improvement", "perf", "test"}
 )
 
-func New(options ...Option) Linter {
+func New(options ...Option) *Linter {
 	var linter Linter
 	for _, opt := range options {
 		opt(&linter)
 	}
 
-	if len(linter.AllowedTypes) == 0 {
-		WithCommitTypes(conventionalCommitTypes)(&linter)
-		WithCommitTypes(angularCommitTypes)(&linter)
-	}
-
-	return linter
+	return &linter
 }
 
-func (l Linter) Lint(commit *object.Commit) error {
+func (l *Linter) Lint(commit *object.Commit) error {
+	if len(l.AllowedTypes) == 0 {
+		WithCommitTypes(conventionalCommitTypes)(l)
+		WithCommitTypes(angularCommitTypes)(l)
+	}
+
 	msg, err := commitmsg.Parse(commit.Message)
 	if err != nil {
 		// Ignore the error if the commit has no parents and is "initial commit"
