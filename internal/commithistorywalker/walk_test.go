@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/somebadcode/conventional-commits-tool/internal/commithistorywalker"
-	"github.com/somebadcode/conventional-commits-tool/internal/repobuilder"
+	"github.com/somebadcode/commit-tool/internal/commithistorywalker"
+	"github.com/somebadcode/commit-tool/internal/repobuilder"
 )
 
 func TestVisit(t *testing.T) {

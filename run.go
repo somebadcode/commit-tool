@@ -12,10 +12,10 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
-	"github.com/somebadcode/conventional-commits-tool/internal/commitlinter"
-	"github.com/somebadcode/conventional-commits-tool/internal/commitlinter/defaultlinter"
-	"github.com/somebadcode/conventional-commits-tool/internal/logging"
-	"github.com/somebadcode/conventional-commits-tool/internal/revisionflag"
+	"github.com/somebadcode/commit-tool/internal/commitlinter"
+	"github.com/somebadcode/commit-tool/internal/commitlinter/defaultlinter"
+	"github.com/somebadcode/commit-tool/internal/logging"
+	"github.com/somebadcode/commit-tool/internal/revisionflag"
 )
 
 const (
