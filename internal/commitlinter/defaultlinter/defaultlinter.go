@@ -60,6 +60,11 @@ func (l *Linter) Lint(commit *object.Commit) error {
 		}
 	}
 
+	// TODO: Add support for linting revert and merge commits.
+	if msg.Revert || msg.Merge {
+		return nil
+	}
+
 	if _, ok := l.AllowedTypes[msg.Type]; !ok {
 		return commitlinter.LintError{
 			Err:  ErrUnconventionalType,

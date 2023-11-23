@@ -132,6 +132,28 @@ func TestParse(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "revert",
+			args: args{
+				message: "Revert \"feat: new stuff\"",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "new stuff",
+				Revert:  true,
+			},
+		},
+		{
+			name: "merge",
+			args: args{
+				message: "Merge branch 'foo' into 'bar'",
+			},
+			want: CommitMessage{
+				Type:    "merge",
+				Subject: "Merge branch 'foo' into 'bar'",
+				Merge:   true,
+			},
+		},
 	}
 
 	t.Parallel()

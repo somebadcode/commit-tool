@@ -104,6 +104,26 @@ func TestLinter_Lint(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("Revert \"feat: add foo\"", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("Merge 'foo' into 'bar'", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+		},
 	}
 
 	t.Parallel()
