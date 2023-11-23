@@ -9,10 +9,7 @@ const (
 )
 
 type Revision struct {
-	name  string
-	rev   plumbing.Revision
-	usage string
-	isSet bool
+	rev plumbing.Revision
 }
 
 func New(rev plumbing.Revision) *Revision {
@@ -21,16 +18,16 @@ func New(rev plumbing.Revision) *Revision {
 	}
 }
 
-func (r Revision) String() string {
+func (r *Revision) String() string {
 	return r.rev.String()
 }
 
-func (r Revision) Set(s string) error {
+func (r *Revision) Set(s string) error {
 	r.rev = plumbing.Revision(s)
 
 	return nil
 }
 
-func (r Revision) Type() string {
+func (r *Revision) Type() string {
 	return FlagType
 }
