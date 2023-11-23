@@ -38,12 +38,3 @@ func Walk(repo *git.Repository, walkFunc WalkFunc) error {
 	})
 
 }
-
-func CommitAtReference(repo *git.Repository, refName plumbing.ReferenceName) (*object.Commit, error) {
-	ref, err := repo.Reference(refName, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return repo.CommitObject(ref.Hash())
-}
