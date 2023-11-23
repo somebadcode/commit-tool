@@ -1,12 +1,17 @@
-package logging
+package zapatomicflag
 
 import (
-	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 )
 
 type AtomicLevelFlag struct {
 	level zap.AtomicLevel
+}
+
+func New(level zap.AtomicLevel) *AtomicLevelFlag {
+	return &AtomicLevelFlag{
+		level: level,
+	}
 }
 
 func (lvl AtomicLevelFlag) String() string {
@@ -19,10 +24,4 @@ func (lvl AtomicLevelFlag) Set(s string) error {
 
 func (lvl AtomicLevelFlag) Type() string {
 	return "level"
-}
-
-func NewAtomicLevelValue(level zap.AtomicLevel) pflag.Value {
-	return &AtomicLevelFlag{
-		level: level,
-	}
 }

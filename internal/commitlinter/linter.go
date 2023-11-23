@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	"go.uber.org/zap"
 )
 
 type ReportFunc func(err error)
@@ -23,8 +24,8 @@ type CommitLinter struct {
 	Repo *git.Repository
 	// Rev is the start of the linter. Defaults to HEAD.
 	Rev plumbing.Revision
-	// UntilRev is the revision where the linter will stop. Will only work if StopFunc is nil.
-	UntilRev plumbing.Revision
+	// OtherRev is the revision of a commit whose common ancestor the linting should stop at.
+	OtherRev plumbing.Revision
 	// ReportFunc is called after each call to Linter if it returned an error.
 	ReportFunc ReportFunc
 	// Linter is called for each commit.
@@ -41,6 +42,23 @@ var (
 
 func NoReporting(_ error) {}
 
+func ZapReporter(logger *zap.Logger) ReportFunc {
+	return func(err error) {
+		var lintError LintError
+		if errors.As(err, &lintError) {
+			logger.Error("bad commit message",
+				zap.Stringer("hash", lintError.Hash),
+				zap.Int("pos", lintError.Pos),
+				zap.Error(errors.Unwrap(err)),
+			)
+		} else {
+			logger.Error("bad commit message",
+				zap.Error(err),
+			)
+		}
+	}
+}
+
 func setDefaults(l *CommitLinter) error {
 	if l.Rev == "" {
 		l.Rev = plumbing.Revision(plumbing.HEAD)
@@ -50,15 +68,13 @@ func setDefaults(l *CommitLinter) error {
 		l.ReportFunc = NoReporting
 	}
 
-	if l.UntilRev != "" && l.StopFunc == nil {
-		hash, err := l.Repo.ResolveRevision(l.UntilRev)
+	if l.OtherRev != "" && l.StopFunc == nil {
+		stopFunc, err := stopAtActualOther(l.Repo, l.Rev, l.OtherRev)
 		if err != nil {
-			return fmt.Errorf("bad stop revision: %w", err)
+			return err
 		}
 
-		l.StopFunc = func(commit *object.Commit) bool {
-			return commit.Hash == *hash
-		}
+		l.StopFunc = stopFunc
 	}
 
 	if l.StopFunc == nil {
@@ -66,6 +82,52 @@ func setDefaults(l *CommitLinter) error {
 	}
 
 	return nil
+}
+
+func stopAtActualOther(repo *git.Repository, rev plumbing.Revision, otherRev plumbing.Revision) (StopFunc, error) {
+	// Get start commit.
+	hash, err := repo.ResolveRevision(rev)
+	if err != nil {
+		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+	}
+
+	var commit *object.Commit
+	commit, err = repo.CommitObject(*hash)
+	if err != nil {
+		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+	}
+
+	// Get other commit.
+	hash, err = repo.ResolveRevision(otherRev)
+	if err != nil {
+		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+	}
+
+	var other *object.Commit
+	other, err = repo.CommitObject(*hash)
+	if err != nil {
+		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+	}
+
+	var mergeBases []*object.Commit
+	mergeBases, err = commit.MergeBase(other)
+	if err != nil {
+		return nil, fmt.Errorf("revisions %q and %q do not have a common ancestor: %w", rev, otherRev, err)
+	}
+
+	return StopAtMergeBases(mergeBases), nil
+}
+
+func StopAtMergeBases(mergeBases []*object.Commit) StopFunc {
+	return func(commit *object.Commit) bool {
+		for _, ancestor := range mergeBases {
+			if ancestor.Hash == commit.Hash {
+				return true
+			}
+		}
+
+		return false
+	}
 }
 
 func NoStop() StopFunc {
