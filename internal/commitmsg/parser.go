@@ -21,10 +21,11 @@ type parser struct {
 }
 
 var (
-	ErrInvalidType    = errors.New("invalid commit type")
-	ErrInvalidScope   = errors.New("invalid commit scope")
-	ErrInvalidSubject = errors.New("invalid commit subject")
-	ErrInvalidMessage = errors.New("invalid commit message")
+	ErrInvalidType              = errors.New("invalid commit type")
+	ErrInvalidScope             = errors.New("invalid commit scope")
+	ErrInvalidSubject           = errors.New("invalid commit subject")
+	ErrInvalidMessage           = errors.New("invalid commit message")
+	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report")
 )
 
 func Parse(message string) (CommitMessage, error) {
@@ -50,14 +51,38 @@ func failParsing(p *parser, err error) stateFunc {
 }
 
 func parseRevertOrMerge(p *parser) stateFunc {
-	/*	if strings.HasPrefix(p.msg, "Merge \"") {
-			p.commit.Merge = true
-			p.acceptUntil("\"")
-		} else if strings.HasPrefix(p.msg, "Revert \"") {
-			p.commit.Revert = true
-			p.acceptUntil("\"")
+	if !(strings.HasPrefix(p.msg, "Merge ") || strings.HasPrefix(p.msg, "Revert ")) {
+		return parseType
+	}
+
+	p.acceptUntil(" ")
+	switch p.text() {
+	case "Merge":
+		r := p.acceptUntil("\n")
+		if r == utf8.RuneError {
+			p.back()
 		}
-	*/
+
+		p.commit.Merge = true
+		p.commit.Type = "merge"
+		p.commit.Subject = p.token()
+		return parseBody
+
+	case "Revert":
+		p.commit.Revert = true
+		p.skip()
+	default:
+		return failParsing(p, ErrUnsupportedSpecialCommit)
+	}
+
+	r := p.acceptUntil("\"")
+	if r == utf8.RuneError {
+		return failParsing(p, ErrInvalidType)
+	}
+
+	p.next()
+	p.skip()
+
 	return parseType
 }
 
@@ -104,6 +129,22 @@ func parseSubject(p *parser) stateFunc {
 	r := p.acceptUntil("\n")
 	if r != utf8.RuneError {
 		p.back()
+	}
+
+	if p.commit.Merge || p.commit.Revert {
+		token := p.token()
+		r, _ = utf8.DecodeLastRuneInString(token)
+		if r == utf8.RuneError {
+			return failParsing(p, ErrUnsupportedSpecialCommit)
+		}
+
+		if r != '"' {
+			return failParsing(p, fmt.Errorf("expected double quote (\"): %w", ErrUnsupportedSpecialCommit))
+		}
+
+		p.commit.Subject = token[:len(token)-1]
+
+		return parseBody
 	}
 
 	p.commit.Subject = p.token()
