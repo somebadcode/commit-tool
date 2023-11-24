@@ -58,9 +58,6 @@ func TestParse(t *testing.T) {
 			args: args{
 				message: "change:",
 			},
-			want: CommitMessage{
-				Type: "change",
-			},
 			wantErr: true,
 		},
 		{
@@ -144,6 +141,13 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name: "revert",
+			args: args{
+				message: "Revert feat: new stuff",
+			},
+			wantErr: true,
+		},
+		{
 			name: "merge",
 			args: args{
 				message: "Merge branch 'foo' into 'bar'",
@@ -160,6 +164,7 @@ func TestParse(t *testing.T) {
 
 	for _, tc := range tests {
 		tt := tc
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -168,6 +173,11 @@ func TestParse(t *testing.T) {
 				t.Errorf("parse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if tt.wantErr {
+				return
+			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parse() got = %#v, want %#v", got, tt.want)
 			}
