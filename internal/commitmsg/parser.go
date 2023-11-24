@@ -34,7 +34,7 @@ func Parse(message string) (CommitMessage, error) {
 }
 
 func (p *parser) parse() (CommitMessage, error) {
-	for state := parseRevertOrMerge(p); state != nil; state = state(p) {
+	for state := parseSpecial(p); state != nil; state = state(p) {
 		// Simple state machine.
 	}
 
@@ -50,40 +50,55 @@ func failParsing(p *parser, err error) stateFunc {
 	return nil
 }
 
-func parseRevertOrMerge(p *parser) stateFunc {
-	if !(strings.HasPrefix(p.msg, "Merge ") || strings.HasPrefix(p.msg, "Revert ")) {
-		return parseType
-	}
-
-	p.acceptUntil(" ")
-	switch p.text() {
-	case "Merge":
-		r := p.acceptUntil("\n")
-		if r == utf8.RuneError {
-			p.back()
-		}
-
-		p.commit.Merge = true
-		p.commit.Type = "merge"
-		p.commit.Subject = p.token()
-		return parseBody
-
-	case "Revert":
-		p.commit.Revert = true
-		p.skip()
-	default:
-		return failParsing(p, ErrUnsupportedSpecialCommit)
-	}
-
-	r := p.acceptUntil("\"")
-	if r == utf8.RuneError {
+func parseSpecial(p *parser) stateFunc {
+	i := strings.IndexRune(p.msg, ' ')
+	if i <= 0 {
 		return failParsing(p, ErrInvalidType)
 	}
 
-	p.next()
+	switch p.msg[:i] {
+	case "Merge":
+		return parseMerge
+	case "Revert":
+		return parseRevert
+	default:
+		return parseType
+	}
+}
+
+func parseRevert(p *parser) stateFunc {
+	r := p.acceptUntil(" ")
+	if r == utf8.RuneError {
+		return failParsing(p, ErrInvalidMessage)
+	}
+
+	if p.token() != "Revert" {
+		return failParsing(p, ErrInvalidMessage)
+	}
+
+	r = p.acceptUntil("\"")
+	if p.next() != '"' {
+		return failParsing(p, fmt.Errorf("expected a quotation mark (\") after \"Revert \": %w", ErrInvalidMessage))
+	}
+
+	p.commit.Revert = true
+
 	p.skip()
 
 	return parseType
+}
+
+func parseMerge(p *parser) stateFunc {
+	r := p.acceptUntil("\n")
+	if r == utf8.RuneError {
+		p.back()
+	}
+
+	p.commit.Merge = true
+	p.commit.Type = "merge"
+	p.commit.Subject = p.token()
+
+	return parseBody
 }
 
 func parseType(p *parser) stateFunc {
@@ -131,15 +146,10 @@ func parseSubject(p *parser) stateFunc {
 		p.back()
 	}
 
-	if p.commit.Merge || p.commit.Revert {
+	if p.commit.Revert {
 		token := p.token()
-		r, _ = utf8.DecodeLastRuneInString(token)
-		if r == utf8.RuneError {
+		if !strings.HasSuffix(token, "\"") {
 			return failParsing(p, ErrUnsupportedSpecialCommit)
-		}
-
-		if r != '"' {
-			return failParsing(p, fmt.Errorf("expected double quote (\"): %w", ErrUnsupportedSpecialCommit))
 		}
 
 		p.commit.Subject = token[:len(token)-1]
