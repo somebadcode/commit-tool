@@ -3,15 +3,19 @@ package commitlinter_test
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/somebadcode/commit-tool/internal/zapctx"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/somebadcode/commit-tool/internal/commitlinter"
 	"github.com/somebadcode/commit-tool/internal/commitlinter/defaultlinter"
-
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
 )
 
@@ -110,8 +114,14 @@ func TestCommitLinter_Lint(t *testing.T) {
 
 	t.Parallel()
 
+	encoder := zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig())
+	ws := zapcore.Lock(zapcore.AddSync(io.Discard))
+	core := zapcore.NewCore(encoder, ws, zap.DebugLevel)
+	ctx := zapctx.WithContext(context.TODO(), zap.New(core))
+
 	for _, tc := range tests {
 		tt := tc
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -130,7 +140,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 				Linter:     tt.fields.Linter,
 			}
 
-			if err = l.Run(context.TODO()); (err != nil) != tt.wantErr {
+			if err = l.Run(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 
 				var lintError commitlinter.LintError

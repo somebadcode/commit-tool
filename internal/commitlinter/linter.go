@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	"github.com/somebadcode/commit-tool/internal/zapctx"
 	"go.uber.org/zap"
 )
 
@@ -170,6 +171,15 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 		return fmt.Errorf("unable to resolve revision: %w", err)
 	}
 
+	logger := zapctx.L(ctx)
+
+	if ev := logger.Check(zap.DebugLevel, "resolved starting revision"); ev != nil {
+		ev.Write(
+			zap.Stringer("revision", l.Rev),
+			zap.Stringer("hash", hash),
+		)
+	}
+
 	var iter object.CommitIter
 	iter, err = l.Repo.Log(&git.LogOptions{
 		From:  *hash,
@@ -183,10 +193,21 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 	var errorCount uint
 	err = iter.ForEach(func(commit *object.Commit) error {
 		if ctx.Err() != nil {
+			if ev := logger.Check(zap.DebugLevel, "cancelling linting"); ev != nil {
+				ev.Write(
+					zap.Stringer("hash", commit.Hash),
+					zap.NamedError("cause", ctx.Err()),
+				)
+			}
+
 			return ctx.Err()
 		}
 
 		if l.StopFunc(commit) {
+			if ev := logger.Check(zap.DebugLevel, "stopping linting"); ev != nil {
+				ev.Write(zap.Stringer("hash", commit.Hash))
+			}
+
 			return storer.ErrStop
 		}
 
@@ -195,6 +216,19 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 			errorCount += 1
 
 			l.ReportFunc(lintErr)
+
+			return nil
+		}
+
+		if ev := logger.Check(zap.DebugLevel, "commit passed"); ev != nil {
+			ev.Write(
+				zap.Stringer("hash", commit.Hash),
+				zap.Dict("author",
+					zap.String("name", commit.Author.Name),
+					zap.String("email", commit.Author.Email),
+					zap.Time("when", commit.Author.When),
+				),
+			)
 		}
 
 		return nil
