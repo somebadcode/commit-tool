@@ -68,7 +68,8 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Linter: defaultlinter.New(),
+				Linter:     defaultlinter.New(),
+				ReportFunc: commitlinter.ZapReporter(zap.NewNop()),
 			},
 			wantErr: true,
 		},

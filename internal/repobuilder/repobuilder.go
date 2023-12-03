@@ -87,7 +87,7 @@ func Commit(message string, options git.CommitOptions) OperationFunc {
 			return fmt.Errorf("invalid options: %w", err)
 		}
 
-		if options.Committer.When.Unix() == 0 {
+		if options.Committer.When.Equal(time.Time{}) {
 			options.Committer.When = time.Now()
 		}
 

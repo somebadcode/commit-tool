@@ -2,7 +2,6 @@ package repobuilder_test
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -16,7 +15,6 @@ func ExampleBuild() {
 		Author: &object.Signature{
 			Name:  "Gopher",
 			Email: "gopher@example.com",
-			When:  time.Now().UTC(),
 		},
 	}
 
@@ -28,7 +26,7 @@ func ExampleBuild() {
 		repobuilder.Commit("feat: add bar", commitOpts),
 	)
 	if err != nil {
-		// Handle this...
+		// Do not panic!
 		panic(err)
 	}
 
@@ -37,7 +35,7 @@ func ExampleBuild() {
 		Order: git.LogOrderBSF,
 	})
 	if err != nil {
-		// Handle this...
+		// Do not panic!
 		panic(err)
 	}
 	defer iter.Close()
@@ -47,7 +45,7 @@ func ExampleBuild() {
 		return nil
 	})
 	if err != nil {
-		// Handle this...
+		// Do not panic!
 		panic(err)
 	}
 
