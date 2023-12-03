@@ -5,7 +5,7 @@ type CommitMessage struct {
 	Scope    string
 	Subject  string
 	Body     string
-	Trailers map[string]string
+	Trailers map[string][]string
 	Breaking bool
 	Revert   bool
 	Merge    bool

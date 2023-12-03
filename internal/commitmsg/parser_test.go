@@ -189,8 +189,8 @@ func TestParse(t *testing.T) {
 				Type:    "feat",
 				Subject: "oi",
 				Body:    "Something fun\n\nSecond paragraph",
-				Trailers: map[string]string{
-					"Ticket": "ABC-4321",
+				Trailers: map[string][]string{
+					"Ticket": {"ABC-4321"},
 				},
 			},
 		},
@@ -203,14 +203,14 @@ func TestParse(t *testing.T) {
 				Type:    "feat",
 				Subject: "oi",
 				Body:    "Something fun\n\nSecond paragraph",
-				Trailers: map[string]string{
-					"Ticket": "ABC-4321",
-					"Fix":    "#12",
+				Trailers: map[string][]string{
+					"Ticket": {"ABC-4321"},
+					"Fix":    {"#12"},
 				},
 			},
 		},
 		{
-			name: "bad_trailers",
+			name: "not_a_trailer",
 			args: args{
 				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321\nMalformed commit",
 			},
@@ -221,7 +221,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "more_bad_trailers",
+			name: "not_a_trailer_alt",
 			args: args{
 				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nFix #900\nMalformed commit",
 			},
@@ -229,6 +229,42 @@ func TestParse(t *testing.T) {
 				Type:    "feat",
 				Subject: "oi",
 				Body:    "Something fun\n\nSecond paragraph\n\nFix #900\nMalformed commit",
+			},
+		},
+		{
+			name: "bad_trailer_key",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nReference to: abcdef1234\nMalformed commit",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph\n\nReference to: abcdef1234\nMalformed commit",
+			},
+		},
+		{
+			name: "more_bad_trailers3",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nReference-to: ",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph\n\nReference-to: ",
+			},
+		},
+		{
+			name: "multi_value_git_trailer",
+			args: args{
+				message: "fix: foo parse bad\n\nFixed this and that\n\nTicket: ABC-100\nTicket: DEF-321",
+			},
+			want: CommitMessage{
+				Type:    "fix",
+				Subject: "foo parse bad",
+				Body:    "Fixed this and that",
+				Trailers: map[string][]string{
+					"Ticket": {"ABC-100", "DEF-321"},
+				},
 			},
 		},
 	}
