@@ -78,7 +78,7 @@ func parseRevert(p *parser) stateFunc {
 		return failParsing(p, ErrInvalidMessage)
 	}
 
-	r = p.acceptUntil("\"")
+	p.acceptUntil("\"")
 	if p.next() != '"' {
 		return failParsing(p, fmt.Errorf("expected a quotation mark (\") after \"Revert \": %w", ErrInvalidMessage))
 	}
