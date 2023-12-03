@@ -27,7 +27,7 @@ var (
 	ErrInvalidSubject           = errors.New("invalid commit subject")
 	ErrInvalidMessage           = errors.New("invalid commit message")
 	ErrInvalidTrailer           = errors.New("invalid trailer in commit message")
-	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report")
+	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report this error if you think it should be supported")
 )
 
 func Parse(message string) (CommitMessage, error) {
