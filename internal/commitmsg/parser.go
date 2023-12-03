@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -222,7 +223,7 @@ func parseTrailers(p *parser) stateFunc {
 	// Save the remains in case the last paragraph can't be parsed as git trailers.
 	remains := p.remains()
 
-	p.commit.Trailers = make(map[string]string)
+	p.commit.Trailers = make(map[string][]string)
 
 	// Parse the trailers but if the error is ErrInvalidTrailer then we should append the remains to the body.
 	// Any other error should bubble up.
@@ -251,6 +252,21 @@ func parseTrailer(p *parser) stateFunc {
 
 	key := p.token()
 
+	if strings.ContainsFunc(key, func(r rune) bool {
+		return unicode.IsSpace(r)
+	}) {
+		return failParsing(p, fmt.Errorf("git trailer key can not contain space: %w", ErrInvalidTrailer))
+	}
+
+	first, size := utf8.DecodeRuneInString(key)
+	if first == utf8.RuneError && size == 1 {
+		return failParsing(p, fmt.Errorf("invalid code point in commit: %w", ErrInvalidMessage))
+	} else if first == utf8.RuneError {
+		return failParsing(p, fmt.Errorf("unexpected end of commit: %w", ErrInvalidTrailer))
+	} else if !unicode.IsUpper(first) {
+		return failParsing(p, fmt.Errorf("git trailer key must start with upper case: %w", ErrInvalidTrailer))
+	}
+
 	switch p.next() {
 	case ' ':
 		if p.Peek() != '#' {
@@ -268,7 +284,13 @@ func parseTrailer(p *parser) stateFunc {
 	p.skip()
 
 	r = p.acceptUntil("\n")
-	p.commit.Trailers[key] = p.token()
+
+	// If the trailer key is empty then it's not a valid trailer so skip the paragraph and fall back.
+	if len(p.text()) == 0 {
+		return failParsing(p, fmt.Errorf("git trailer key is empty: %w", ErrInvalidTrailer))
+	}
+
+	p.commit.Trailers[key] = append(p.commit.Trailers[key], p.token())
 	if r == utf8.RuneError {
 		return nil
 	}
