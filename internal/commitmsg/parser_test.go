@@ -158,6 +158,79 @@ func TestParse(t *testing.T) {
 				Merge:   true,
 			},
 		},
+		{
+			name: "single_paragraph",
+			args: args{
+				message: "feat: hej\n\nSomething fun",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "hej",
+				Body:    "Something fun",
+			},
+		},
+		{
+			name: "two_paragraphs",
+			args: args{
+				message: "feat: hallo\n\nSomething fun\n\nSecond paragraph",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "hallo",
+				Body:    "Something fun\n\nSecond paragraph",
+			},
+		},
+		{
+			name: "trailer",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph",
+				Trailers: map[string]string{
+					"Ticket": "ABC-4321",
+				},
+			},
+		},
+		{
+			name: "trailers",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321\nFix #12",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph",
+				Trailers: map[string]string{
+					"Ticket": "ABC-4321",
+					"Fix":    "#12",
+				},
+			},
+		},
+		{
+			name: "bad_trailers",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321\nMalformed commit",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph\n\nTicket: ABC-4321\nMalformed commit",
+			},
+		},
+		{
+			name: "more_bad_trailers",
+			args: args{
+				message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nFix #900\nMalformed commit",
+			},
+			want: CommitMessage{
+				Type:    "feat",
+				Subject: "oi",
+				Body:    "Something fun\n\nSecond paragraph\n\nFix #900\nMalformed commit",
+			},
+		},
 	}
 
 	t.Parallel()
