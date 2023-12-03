@@ -33,7 +33,7 @@ func init() {
 				atomicLogLevel,
 			)
 
-			ctx := zapctx.WithContext(cmd.Context(), zap.New(core))
+			ctx := zapctx.Context(cmd.Context(), zap.New(core))
 			cmd.SetContext(ctx)
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {

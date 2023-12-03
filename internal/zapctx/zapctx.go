@@ -10,7 +10,7 @@ type contextKey string
 
 var contextKeyLogger contextKey = "zap-logger"
 
-func WithContext(ctx context.Context, logger *zap.Logger) context.Context {
+func Context(ctx context.Context, logger *zap.Logger) context.Context {
 	loggerCtx := context.WithValue(ctx, contextKeyLogger, logger)
 	return loggerCtx
 }

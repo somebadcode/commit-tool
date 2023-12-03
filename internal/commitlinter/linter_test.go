@@ -117,7 +117,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 	encoder := zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig())
 	ws := zapcore.Lock(zapcore.AddSync(io.Discard))
 	core := zapcore.NewCore(encoder, ws, zap.DebugLevel)
-	ctx := zapctx.WithContext(context.TODO(), zap.New(core))
+	ctx := zapctx.Context(context.TODO(), zap.New(core))
 
 	for _, tc := range tests {
 		tt := tc
