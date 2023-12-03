@@ -25,6 +25,7 @@ var (
 	ErrInvalidScope             = errors.New("invalid commit scope")
 	ErrInvalidSubject           = errors.New("invalid commit subject")
 	ErrInvalidMessage           = errors.New("invalid commit message")
+	ErrInvalidTrailer           = errors.New("invalid trailer in commit message")
 	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report")
 )
 
@@ -120,6 +121,31 @@ func parseType(p *parser) stateFunc {
 	return parseSubject
 }
 
+func parseScope(p *parser) stateFunc {
+	if r := p.next(); r != '(' {
+		return failParsing(p, ErrInvalidSubject)
+	}
+	p.skip()
+
+	r := p.acceptUntil(")")
+	if r == utf8.RuneError {
+		return failParsing(p, ErrInvalidScope)
+	}
+
+	p.commit.Scope = p.token()
+	if p.commit.Scope == "" {
+		return failParsing(p, fmt.Errorf("parenthesis found but scope is empty: %w", ErrInvalidScope))
+	}
+
+	p.next()
+
+	if p.Peek() == '!' {
+		return parseBreaking
+	}
+
+	return parseSubject
+}
+
 func parseBreaking(p *parser) stateFunc {
 	if r := p.next(); r != '!' {
 		return failParsing(p, ErrInvalidMessage)
@@ -172,34 +198,85 @@ func parseBody(p *parser) stateFunc {
 
 	p.skip()
 
-	p.commit.Body = strings.TrimSpace(p.remains())
+	i := strings.LastIndex(p.remains(), "\n\n")
+	if i == -1 {
+		// No more paragraphs found. Using the remains for the message body and stopping.
+		p.commit.Body = strings.TrimSpace(p.remains())
+
+		return nil
+	}
+
+	// Paragraphs were found, so move position up to the end of the penultimate paragraph and save the body.
+	p.pos += i
+	p.commit.Body = strings.TrimSpace(p.token())
+
+	// Move position up two positions ("\n\n") and skip.
+	p.pos += 2
+	p.skip()
+
+	// Parse trailers.
+	return parseTrailers
+}
+
+func parseTrailers(p *parser) stateFunc {
+	// Save the remains in case the last paragraph can't be parsed as git trailers.
+	remains := p.remains()
+
+	p.commit.Trailers = make(map[string]string)
+
+	// Parse the trailers but if the error is ErrInvalidTrailer then we should append the remains to the body.
+	// Any other error should bubble up.
+	for state := parseTrailer(p); state != nil; state = state(p) {
+	}
+
+	if errors.Is(p.err, ErrInvalidTrailer) {
+		p.err = nil
+		p.commit.Body += "\n\n" + remains
+		p.commit.Trailers = nil
+	}
+
+	// If there are no trailers, make sure the map is nil.
+	if p.commit.Trailers != nil && len(p.commit.Trailers) == 0 {
+		p.commit.Trailers = nil
+	}
 
 	return nil
 }
 
-func parseScope(p *parser) stateFunc {
-	if r := p.next(); r != '(' {
-		return failParsing(p, ErrInvalidSubject)
+func parseTrailer(p *parser) stateFunc {
+	r := p.acceptUntil(": ")
+	if r == utf8.RuneError {
+		return nil
 	}
+
+	key := p.token()
+
+	switch p.next() {
+	case ' ':
+		if p.Peek() != '#' {
+			return failParsing(p, fmt.Errorf("expected a pound/hash sign: %w", ErrInvalidTrailer))
+		}
+
+	case ':':
+		if p.Peek() != ' ' {
+			return failParsing(p, fmt.Errorf("expected a space: %w", ErrInvalidTrailer))
+		}
+
+		p.next()
+	}
+
 	p.skip()
 
-	r := p.acceptUntil(")")
+	r = p.acceptUntil("\n")
+	p.commit.Trailers[key] = p.token()
 	if r == utf8.RuneError {
-		return failParsing(p, ErrInvalidScope)
-	}
-
-	p.commit.Scope = p.token()
-	if p.commit.Scope == "" {
-		return failParsing(p, fmt.Errorf("parenthesis found but scope is empty: %w", ErrInvalidScope))
+		return nil
 	}
 
 	p.next()
+	p.skip()
 
-	if p.Peek() == '!' {
-		return parseBreaking
-	}
-
-	return parseSubject
+	return parseTrailer
 }
 
 func (p *parser) remains() string {
@@ -267,8 +344,3 @@ func (p *parser) text() string {
 func (p *parser) skip() {
 	p.start = p.pos
 }
-
-/*func (p *parser) line() int {
-	return strings.Count(p.msg[:p.pos], "\n") + 1
-}
-*/
