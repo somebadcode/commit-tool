@@ -8,7 +8,7 @@ func AllowInitialCommit() Option {
 	}
 }
 
-func WithCommitTypes(types []string) Option {
+func WithCommitTypes(types ...string) Option {
 	return func(l *Linter) {
 		if l.AllowedTypes == nil {
 			l.AllowedTypes = make(map[string]struct{})
