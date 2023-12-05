@@ -8,6 +8,8 @@ type AtomicLevelFlag struct {
 	level zap.AtomicLevel
 }
 
+const TypeLevel = "level"
+
 func New(level zap.AtomicLevel) *AtomicLevelFlag {
 	return &AtomicLevelFlag{
 		level: level,
@@ -23,5 +25,5 @@ func (lvl AtomicLevelFlag) Set(s string) error {
 }
 
 func (lvl AtomicLevelFlag) Type() string {
-	return "level"
+	return TypeLevel
 }
