@@ -16,8 +16,8 @@ var RootCommand *cobra.Command
 func init() {
 	atomicLogLevel := zap.NewAtomicLevelAt(zap.InfoLevel)
 
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
+	buildInfo, hasBuildInfo := debug.ReadBuildInfo()
+	if !hasBuildInfo {
 		panic("build information is missing")
 	}
 

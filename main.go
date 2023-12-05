@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/somebadcode/commit-tool/cmd"
-	_ "github.com/somebadcode/commit-tool/cmd/lint"
+	"github.com/somebadcode/commit-tool/internal/cmd"
+	_ "github.com/somebadcode/commit-tool/internal/cmd/lint"
 )
 
 // //go:embed LICENSE
