@@ -124,12 +124,35 @@ func TestLinter_Lint(t *testing.T) {
 				Linter: defaultlinter.New(),
 			},
 		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("improvement(bah): ", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+			wantErr: true,
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("improvement(bah): Apple", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+			wantErr: true,
+		},
 	}
 
 	t.Parallel()
 
 	for _, tc := range tests {
 		tt := tc
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
