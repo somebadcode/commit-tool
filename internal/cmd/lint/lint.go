@@ -8,7 +8,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 
-	"github.com/somebadcode/commit-tool/cmd"
+	"github.com/somebadcode/commit-tool/internal/cmd"
 	"github.com/somebadcode/commit-tool/internal/commitlinter"
 	"github.com/somebadcode/commit-tool/internal/commitlinter/defaultlinter"
 	"github.com/somebadcode/commit-tool/internal/revisionflag"
