@@ -41,8 +41,11 @@ var (
 	ErrNoLinter           = errors.New("no linter has been specified")
 )
 
+// NoReporting will cause the linter to not report any of the lint errors, but the linter will still return an error
+// if any commit doesn't adhere to the linter's expectations.
 func NoReporting(_ error) {}
 
+// ZapReporter will cause the linter to report lint errors using the specified Zap logger.
 func ZapReporter(logger *zap.Logger) ReportFunc {
 	return func(err error) {
 		var lintError LintError
@@ -119,6 +122,7 @@ func stopAtActualOther(repo *git.Repository, rev plumbing.Revision, otherRev plu
 	return StopAtMergeBases(mergeBases), nil
 }
 
+// StopAtMergeBases will cause the linter to stop at any of the merge bases.
 func StopAtMergeBases(mergeBases []*object.Commit) StopFunc {
 	return func(commit *object.Commit) bool {
 		for _, ancestor := range mergeBases {
@@ -131,12 +135,14 @@ func StopAtMergeBases(mergeBases []*object.Commit) StopFunc {
 	}
 }
 
+// NoStop will cause the linter to never stop. Allows the linter to run until the last commit.
 func NoStop() StopFunc {
 	return func(_ *object.Commit) bool {
 		return false
 	}
 }
 
+// StopAfterN will cause the linter to stop after N commits.
 func StopAfterN(n uint) StopFunc {
 	return func(_ *object.Commit) bool {
 		n--
@@ -161,6 +167,7 @@ func (l *CommitLinter) Validate() error {
 	return nil
 }
 
+// Run will traverse the commit tree, lint each commit message. The structure of the tree is ignored.
 func (l *CommitLinter) Run(ctx context.Context) error {
 	if err := l.Validate(); err != nil {
 		return err
