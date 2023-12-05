@@ -16,7 +16,3 @@ func (err ParseError) Error() string {
 func (err ParseError) Unwrap() error {
 	return err.err
 }
-
-func (err ParseError) Err() error {
-	return err.err
-}
