@@ -30,6 +30,11 @@ var (
 	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report this error if you think it should be supported")
 )
 
+const (
+	TrailerKeyBreakingChange    = "BREAKING CHANGE"
+	TrailerKeyBreakingChangeAlt = "BREAKING-CHANGE"
+)
+
 func Parse(message string) (CommitMessage, error) {
 	p := &parser{msg: message}
 	return p.parse()
@@ -38,6 +43,14 @@ func Parse(message string) (CommitMessage, error) {
 func (p *parser) parse() (CommitMessage, error) {
 	for state := parseSpecial(p); state != nil; state = state(p) {
 		// Simple state machine.
+	}
+
+	// Breaking change might be flagged using a trailer key.
+	for k := range p.commit.Trailers {
+		if k == TrailerKeyBreakingChange || k == TrailerKeyBreakingChangeAlt {
+			p.commit.Breaking = true
+			break
+		}
 	}
 
 	return p.commit, p.err
@@ -283,19 +296,36 @@ func parseTrailer(p *parser) stateFunc {
 
 	p.skip()
 
-	r = p.acceptUntil("\n")
+	for {
+		r = p.acceptUntil("\n")
+		p.next()
+		if !unicode.IsSpace(p.Peek()) {
+			break
+		}
+	}
 
 	// If the trailer key is empty then it's not a valid trailer so skip the paragraph and fall back.
 	if len(p.text()) == 0 {
 		return failParsing(p, fmt.Errorf("git trailer key is empty: %w", ErrInvalidTrailer))
 	}
 
-	p.commit.Trailers[key] = append(p.commit.Trailers[key], p.token())
+	lines := strings.FieldsFunc(p.token(), func(r rune) bool {
+		return r == '\n'
+	})
+
+	sb := strings.Builder{}
+	defer sb.Reset()
+
+	for _, line := range lines {
+		sb.WriteString(strings.TrimSpace(line))
+		sb.WriteRune('\n')
+	}
+
+	p.commit.Trailers[key] = append(p.commit.Trailers[key], strings.TrimSpace(sb.String()))
 	if r == utf8.RuneError {
 		return nil
 	}
 
-	p.next()
 	p.skip()
 
 	return parseTrailer
