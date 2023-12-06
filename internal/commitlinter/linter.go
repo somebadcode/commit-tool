@@ -9,8 +9,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
-	"github.com/somebadcode/commit-tool/internal/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/somebadcode/commit-tool/internal/zapctx"
 )
 
 type ReportFunc func(err error)
