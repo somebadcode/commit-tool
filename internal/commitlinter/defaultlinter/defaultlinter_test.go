@@ -102,7 +102,6 @@ func TestLinter_Lint(t *testing.T) {
 				Rev:    "HEAD",
 				Linter: defaultlinter.New(),
 			},
-			wantErr: true,
 		},
 		{
 			repoOps: []repobuilder.OperationFunc{
@@ -142,7 +141,7 @@ func TestLinter_Lint(t *testing.T) {
 			},
 			fields: fields{
 				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Linter: defaultlinter.New(defaultlinter.WithRule(defaultlinter.RuleSubjectNoLeadingUpperCase)),
 			},
 			wantErr: true,
 		},
