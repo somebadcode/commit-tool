@@ -267,6 +267,21 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "multi_line_git_trailer",
+			args: args{
+				message: "fix: foo parse bad\n\nFixed this and that\n\nTicket: ABC-100\nSecurity: Addresses 1234 by this and that method\n and according to the discussion in incident SEC-34, blah boo blaha\n ",
+			},
+			want: CommitMessage{
+				Type:    "fix",
+				Subject: "foo parse bad",
+				Body:    "Fixed this and that",
+				Trailers: map[string][]string{
+					"Ticket":   {"ABC-100"},
+					"Security": {"Addresses 1234 by this and that method\nand according to the discussion in incident SEC-34, blah boo blaha"},
+				},
+			},
+		},
 	}
 
 	t.Parallel()
