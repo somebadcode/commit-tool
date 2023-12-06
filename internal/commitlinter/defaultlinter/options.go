@@ -8,14 +8,8 @@ func AllowInitialCommit() Option {
 	}
 }
 
-func WithCommitTypes(types ...string) Option {
+func WithRule(rules ...RuleFunc) Option {
 	return func(l *Linter) {
-		if l.AllowedTypes == nil {
-			l.AllowedTypes = make(map[string]struct{})
-		}
-
-		for _, typ := range types {
-			l.AllowedTypes[typ] = struct{}{}
-		}
+		l.Rules = append(l.Rules, rules...)
 	}
 }
