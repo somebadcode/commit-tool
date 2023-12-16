@@ -282,6 +282,55 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "breaking_change",
+			args: args{
+				message: "fix: trailer parsing\n\nFixed this and that\n\nTicket: ABC-100\nBREAKING CHANGE: Yup!",
+			},
+			want: CommitMessage{
+				Type:     "fix",
+				Subject:  "trailer parsing",
+				Body:     "Fixed this and that",
+				Breaking: true,
+				Trailers: map[string][]string{
+					"Ticket":          {"ABC-100"},
+					"BREAKING CHANGE": {"Yup!"},
+				},
+			},
+		},
+		{
+			name: "breaking_stuff_bad",
+			args: args{
+				message: "fix: trailer parsing\n\nFixed this and that\n\nBREAKING STUFF: Yup!",
+			},
+			want: CommitMessage{
+				Type:    "fix",
+				Subject: "trailer parsing",
+				Body:    "Fixed this and that\n\nBREAKING STUFF: Yup!",
+			},
+		},
+		{
+			name: "trailer_not_upper",
+			args: args{
+				message: "fix: trailer parsing\n\nFixed this and that\n\nthis-is-not-upper: nope!",
+			},
+			want: CommitMessage{
+				Type:    "fix",
+				Subject: "trailer parsing",
+				Body:    "Fixed this and that\n\nthis-is-not-upper: nope!",
+			},
+		},
+		{
+			name: "trailer_bad_key",
+			args: args{
+				message: "fix: trailer parsing\n\nFixed this and that\n\nSomething strange: Yup!",
+			},
+			want: CommitMessage{
+				Type:    "fix",
+				Subject: "trailer parsing",
+				Body:    "Fixed this and that\n\nSomething strange: Yup!",
+			},
+		},
 	}
 
 	t.Parallel()
@@ -311,7 +360,7 @@ func TestParse(t *testing.T) {
 
 func BenchmarkParse(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, _ = Parse("feat(parser)!: added support for trailers\n\nAdded support for Git trailers.")
+		_, _ = Parse("feat(parser)!: added support for trailers\n\nAdded support for Git trailers.\nMore stuff, yada yada!\n\nSigned-off-by: Gopher\nBREAKING-CHANGE: Yes!\nSecurity: Yada this and yada that.\n With multiline trailer\n and just more unnecessary jabber\nFoo: 9876")
 	}
 }
 

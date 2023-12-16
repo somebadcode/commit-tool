@@ -15,10 +15,10 @@ type parser struct {
 	msg    string
 	start  int
 	pos    int
-	char   rune
 	size   int
 	commit CommitMessage
 	err    error
+	char   rune
 }
 
 var (
@@ -31,13 +31,13 @@ var (
 )
 
 const (
-	TrailerKeyBreakingChange    = "BREAKING CHANGE"
-	TrailerKeyBreakingChangeAlt = "BREAKING-CHANGE"
+	TrailerKeyBreakingChangePrefix = "BREAKING"
+	TrailerKeyBreakingChange       = TrailerKeyBreakingChangePrefix + " CHANGE"
+	TrailerKeyBreakingChangeAlt    = "BREAKING-CHANGE"
 )
 
 func Parse(message string) (CommitMessage, error) {
-	p := &parser{msg: message}
-	return p.parse()
+	return (&parser{msg: message}).parse()
 }
 
 func (p *parser) parse() (CommitMessage, error) {
@@ -206,8 +206,6 @@ func parseBody(p *parser) stateFunc {
 	r := p.next()
 	if r == utf8.RuneError {
 		return nil
-	} else if r != '\n' {
-		return failParsing(p, ErrInvalidMessage)
 	}
 
 	p.skip()
@@ -259,24 +257,24 @@ func parseTrailers(p *parser) stateFunc {
 
 func parseTrailer(p *parser) stateFunc {
 	r := p.acceptUntil(": ")
+
+	// If there's a space and the text matches the breaking change prefix, continue until `:` and make sure that it's
+	// a breaking change.
+	if r == ' ' && p.text() == TrailerKeyBreakingChangePrefix {
+		r = p.acceptUntil(":")
+		if p.text() != TrailerKeyBreakingChange {
+			return failParsing(p, fmt.Errorf("git trailer key can not contain space, expected key %q: %w", TrailerKeyBreakingChange, ErrInvalidTrailer))
+		}
+	}
+
 	if r == utf8.RuneError {
 		return nil
 	}
 
 	key := p.token()
 
-	if strings.ContainsFunc(key, func(r rune) bool {
-		return unicode.IsSpace(r)
-	}) {
-		return failParsing(p, fmt.Errorf("git trailer key can not contain space: %w", ErrInvalidTrailer))
-	}
-
-	first, size := utf8.DecodeRuneInString(key)
-	if first == utf8.RuneError && size == 1 {
-		return failParsing(p, fmt.Errorf("invalid code point in commit: %w", ErrInvalidMessage))
-	} else if first == utf8.RuneError {
-		return failParsing(p, fmt.Errorf("unexpected end of commit: %w", ErrInvalidTrailer))
-	} else if !unicode.IsUpper(first) {
+	// Trailer key must start with upper case.
+	if first, _ := utf8.DecodeRuneInString(key); !unicode.IsUpper(first) {
 		return failParsing(p, fmt.Errorf("git trailer key must start with upper case: %w", ErrInvalidTrailer))
 	}
 
@@ -298,6 +296,10 @@ func parseTrailer(p *parser) stateFunc {
 
 	for {
 		r = p.acceptUntil("\n")
+		if r == utf8.RuneError {
+			break
+		}
+
 		p.next()
 		if !unicode.IsSpace(p.Peek()) {
 			break
@@ -319,6 +321,10 @@ func parseTrailer(p *parser) stateFunc {
 	for _, line := range lines {
 		sb.WriteString(strings.TrimSpace(line))
 		sb.WriteRune('\n')
+	}
+
+	if key == TrailerKeyBreakingChange || key == TrailerKeyBreakingChangeAlt {
+		p.commit.Breaking = true
 	}
 
 	p.commit.Trailers[key] = append(p.commit.Trailers[key], strings.TrimSpace(sb.String()))
