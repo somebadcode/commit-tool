@@ -56,11 +56,13 @@ func ZapReporter(logger *zap.Logger) ReportFunc {
 				zap.Int("pos", lintError.Pos),
 				zap.Error(errors.Unwrap(err)),
 			)
-		} else {
-			logger.Error("bad commit message",
-				zap.Error(err),
-			)
+
+			return
 		}
+
+		logger.Error("bad commit message",
+			zap.Error(err),
+		)
 	}
 }
 
