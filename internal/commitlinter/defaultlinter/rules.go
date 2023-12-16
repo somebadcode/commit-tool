@@ -22,7 +22,6 @@ func RuleSubjectNoLeadingUpperCase(msg commitmsg.CommitMessage) error {
 		return fmt.Errorf("no subject detected: %w", ErrInvalidSubject)
 	} else if first == utf8.RuneError && size == 1 {
 		return fmt.Errorf("bad subject: %w", ErrInvalidCharacter)
-
 	}
 
 	if unicode.IsUpper(first) {
