@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
-	"go.uber.org/zap"
 
-	"github.com/somebadcode/commit-tool/internal/zapctx"
+	"github.com/somebadcode/commit-tool/slogctx"
 )
 
 type ReportFunc func(err error)
@@ -46,23 +46,24 @@ var (
 // if any commit doesn't adhere to the linter's expectations.
 func NoReporting(_ error) {}
 
-// ZapReporter will cause the linter to report lint errors using the specified Zap logger.
-func ZapReporter(logger *zap.Logger) ReportFunc {
+// SlogReporter will log linter errors using [log/slog].
+func SlogReporter(logger *slog.Logger) ReportFunc {
 	return func(err error) {
 		var lintError LintError
 		if errors.As(err, &lintError) {
-			logger.Error("bad commit message",
-				zap.Stringer("hash", lintError.Hash),
-				zap.Int("pos", lintError.Pos),
-				zap.Error(errors.Unwrap(err)),
+			logger.LogAttrs(context.Background(), slog.LevelError, "bad commit message",
+				slog.String("hash", lintError.Hash.String()),
+				slog.Int("pos", lintError.Pos),
+				slog.String("err", errors.Unwrap(err).Error()),
 			)
 
 			return
 		}
 
-		logger.Error("bad commit message",
-			zap.Error(err),
+		logger.LogAttrs(context.Background(), slog.LevelError, "bad commit message",
+			slog.String("err", errors.Unwrap(err).Error()),
 		)
+
 	}
 }
 
@@ -181,12 +182,12 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 		return fmt.Errorf("unable to resolve revision: %w", err)
 	}
 
-	logger := zapctx.L(ctx)
+	logger := slogctx.L(ctx)
 
-	if ev := logger.Check(zap.DebugLevel, "resolved starting revision"); ev != nil {
-		ev.Write(
-			zap.Stringer("revision", l.Rev),
-			zap.Stringer("hash", hash),
+	if logger.Enabled(ctx, slog.LevelDebug) {
+		logger.LogAttrs(ctx, slog.LevelDebug, "resolved starting revision",
+			slog.String("revision", l.Rev.String()),
+			slog.String("hash", hash.String()),
 		)
 	}
 
@@ -203,10 +204,10 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 	var errorCount uint
 	err = iter.ForEach(func(commit *object.Commit) error {
 		if ctx.Err() != nil {
-			if ev := logger.Check(zap.DebugLevel, "cancelling linting"); ev != nil {
-				ev.Write(
-					zap.Stringer("hash", commit.Hash),
-					zap.NamedError("cause", ctx.Err()),
+			if logger.Enabled(ctx, slog.LevelDebug) {
+				logger.LogAttrs(ctx, slog.LevelDebug, "cancelling linting",
+					slog.String("hash", commit.Hash.String()),
+					slog.String("cause", ctx.Err().Error()),
 				)
 			}
 
@@ -214,8 +215,10 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 		}
 
 		if l.StopFunc(commit) {
-			if ev := logger.Check(zap.DebugLevel, "stopping linting"); ev != nil {
-				ev.Write(zap.Stringer("hash", commit.Hash))
+			if logger.Enabled(ctx, slog.LevelDebug) {
+				logger.LogAttrs(ctx, slog.LevelDebug, "stopping linting",
+					slog.String("hash", commit.Hash.String()),
+				)
 			}
 
 			return storer.ErrStop
@@ -230,14 +233,9 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 			return nil
 		}
 
-		if ev := logger.Check(zap.DebugLevel, "commit passed"); ev != nil {
-			ev.Write(
-				zap.Stringer("hash", commit.Hash),
-				zap.Dict("author",
-					zap.String("name", commit.Author.Name),
-					zap.String("email", commit.Author.Email),
-					zap.Time("when", commit.Author.When),
-				),
+		if logger.Enabled(ctx, slog.LevelDebug) {
+			logger.LogAttrs(ctx, slog.LevelDebug, "commit passed",
+				slog.Any("commit", commit),
 			)
 		}
 

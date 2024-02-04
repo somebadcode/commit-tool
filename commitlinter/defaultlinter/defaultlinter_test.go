@@ -1,25 +1,26 @@
-package commitlinter_test
+package defaultlinter_test
 
 import (
 	"context"
-	"errors"
-	"io"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/somebadcode/commit-tool/internal/zapctx"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-
-	"github.com/somebadcode/commit-tool/internal/commitlinter"
-	"github.com/somebadcode/commit-tool/internal/commitlinter/defaultlinter"
+	"github.com/somebadcode/commit-tool/commitlinter"
+	"github.com/somebadcode/commit-tool/commitlinter/defaultlinter"
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
 )
 
-func TestCommitLinter_Lint(t *testing.T) {
+func TestLinter_Lint(t *testing.T) {
+	type fields struct {
+		Rev        plumbing.Revision
+		ReportFunc commitlinter.ReportFunc
+		StopFunc   commitlinter.StopFunc
+		Linter     commitlinter.Linter
+	}
+
 	commitOpts := git.CommitOptions{
 		AllowEmptyCommits: true,
 		Author: &object.Signature{
@@ -29,14 +30,6 @@ func TestCommitLinter_Lint(t *testing.T) {
 		},
 	}
 
-	type fields struct {
-		Rev        plumbing.Revision
-		OtherRev   plumbing.Revision
-		ReportFunc commitlinter.ReportFunc
-		StopFunc   commitlinter.StopFunc
-		Linter     commitlinter.Linter
-	}
-
 	tests := []struct {
 		name    string
 		repoOps []repobuilder.OperationFunc
@@ -44,7 +37,6 @@ func TestCommitLinter_Lint(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "simple_with_branch",
 			repoOps: []repobuilder.OperationFunc{
 				repobuilder.Commit("Initial commit", commitOpts),
 				repobuilder.Commit("feat: add foo", commitOpts),
@@ -54,11 +46,28 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
+				StopFunc: func(commit *object.Commit) bool {
+					return false
+				},
+			},
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("Initial commit", commitOpts),
+				repobuilder.Commit("feat: add foo", commitOpts),
+				repobuilder.CheckoutBranch("fix-foo"),
+				repobuilder.Commit("fix(foo): avoid panic", commitOpts),
+				repobuilder.Commit("chore(foo): tweaked comments", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
 				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
 			},
 		},
 		{
-			name: "bad_commit",
 			repoOps: []repobuilder.OperationFunc{
 				repobuilder.Commit("Initial commit", commitOpts),
 				repobuilder.Commit("add foo", commitOpts),
@@ -68,57 +77,77 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Linter:     defaultlinter.New(),
-				ReportFunc: commitlinter.ZapReporter(zap.NewNop()),
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
 			},
 			wantErr: true,
 		},
 		{
-			name: "bad_commit_short",
 			repoOps: []repobuilder.OperationFunc{
 				repobuilder.Commit("Initial commit", commitOpts),
 				repobuilder.Commit("add foo", commitOpts),
 			},
 			fields: fields{
+				Rev:    "HEAD",
 				Linter: defaultlinter.New(),
 			},
 			wantErr: true,
 		},
 		{
-			name: "StopAfterN(1)",
 			repoOps: []repobuilder.OperationFunc{
-				repobuilder.Commit("bad commit", commitOpts),
-				repobuilder.Commit("fix: bug #1", commitOpts),
-				repobuilder.Commit("feat: add foo", commitOpts),
+				repobuilder.Commit("Initial commit", commitOpts),
+				repobuilder.Commit("woop: add foo", commitOpts),
 			},
 			fields: fields{
-				Linter:   defaultlinter.New(),
-				StopFunc: commitlinter.StopAfterN(1),
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
 			},
 		},
 		{
-			name: "OtherRev",
 			repoOps: []repobuilder.OperationFunc{
-				repobuilder.Commit("bad commit #1", commitOpts),
-				repobuilder.Commit("bad commit #2", commitOpts),
-				repobuilder.Commit("bad commit #3", commitOpts),
-				repobuilder.CheckoutBranch("feature/xyz"),
-				repobuilder.Commit("fix: bug #1", commitOpts),
-				repobuilder.Commit("feat: add foo", commitOpts),
+				repobuilder.Commit("Revert \"feat: add foo\"", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Linter:   defaultlinter.New(),
-				OtherRev: "refs/heads/main",
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
 			},
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("Merge 'foo' into 'bar'", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("improvement(bah): ", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(),
+			},
+			wantErr: true,
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("improvement(bah): Apple", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev:    "HEAD",
+				Linter: defaultlinter.New(defaultlinter.WithRule(defaultlinter.RuleSubjectNoLeadingUpperCase)),
+			},
+			wantErr: true,
 		},
 	}
 
 	t.Parallel()
-
-	encoder := zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig())
-	ws := zapcore.Lock(zapcore.AddSync(io.Discard))
-	core := zapcore.NewCore(encoder, ws, zap.DebugLevel)
-	ctx := zapctx.Context(context.TODO(), zap.New(core))
 
 	for _, tc := range tests {
 		tt := tc
@@ -135,20 +164,13 @@ func TestCommitLinter_Lint(t *testing.T) {
 			l := &commitlinter.CommitLinter{
 				Repo:       repo,
 				Rev:        tt.fields.Rev,
-				OtherRev:   tt.fields.OtherRev,
 				ReportFunc: tt.fields.ReportFunc,
 				StopFunc:   tt.fields.StopFunc,
 				Linter:     tt.fields.Linter,
 			}
 
-			if err = l.Run(ctx); (err != nil) != tt.wantErr {
+			if err = l.Run(context.TODO()); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
-
-				var lintError commitlinter.LintError
-
-				if errors.As(err, &lintError) {
-					t.Errorf("Run() error = %v", lintError)
-				}
 			}
 		})
 	}

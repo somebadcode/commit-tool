@@ -9,21 +9,21 @@ const (
 )
 
 type Revision struct {
-	rev plumbing.Revision
+	Rev plumbing.Revision
 }
 
 func New(rev plumbing.Revision) *Revision {
 	return &Revision{
-		rev: rev,
+		Rev: rev,
 	}
 }
 
 func (r *Revision) String() string {
-	return r.rev.String()
+	return r.Rev.String()
 }
 
 func (r *Revision) Set(s string) error {
-	r.rev = plumbing.Revision(s)
+	r.Rev = plumbing.Revision(s)
 
 	return nil
 }

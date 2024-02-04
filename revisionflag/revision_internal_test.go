@@ -22,7 +22,7 @@ func TestNew(t *testing.T) {
 				rev: "main",
 			},
 			want: &Revision{
-				rev: "main",
+				Rev: "main",
 			},
 		},
 	}
@@ -61,7 +61,7 @@ func TestRevision_Set(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Revision{
-				rev: tt.fields.rev,
+				Rev: tt.fields.rev,
 			}
 			if err := r.Set(tt.args.s); (err != nil) != tt.wantErr {
 				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
@@ -89,7 +89,7 @@ func TestRevision_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Revision{
-				rev: tt.fields.rev,
+				Rev: tt.fields.rev,
 			}
 			if got := r.String(); got != tt.want {
 				t.Errorf("String() = %v, want %v", got, tt.want)
@@ -117,7 +117,7 @@ func TestRevision_Type(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Revision{
-				rev: tt.fields.rev,
+				Rev: tt.fields.rev,
 			}
 			if got := r.Type(); got != tt.want {
 				t.Errorf("Type() = %v, want %v", got, tt.want)
