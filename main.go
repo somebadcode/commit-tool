@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/somebadcode/commit-tool/internal/cmd"
-	_ "github.com/somebadcode/commit-tool/internal/cmd/lint"
+	"github.com/somebadcode/commit-tool/cmd"
+	_ "github.com/somebadcode/commit-tool/cmd/lint"
 )
 
 // //go:embed LICENSE
@@ -25,8 +25,7 @@ func run() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	err := cmd.RootCommand.ExecuteContext(ctx)
-	if err != nil {
+	if err := cmd.ExecuteContext(ctx); err != nil {
 		return 1
 	}
 

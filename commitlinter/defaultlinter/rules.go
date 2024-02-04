@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/somebadcode/commit-tool/internal/commitmsg"
+	"github.com/somebadcode/commit-tool/commitmsg"
 )
 
 type RuleFunc func(message commitmsg.CommitMessage) error
