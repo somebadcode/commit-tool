@@ -9,14 +9,14 @@ import (
 
 type contextKey string
 
-var contextKeyLogger contextKey = "slog"
+const contextKeyLogger contextKey = "slog"
 
 func Context(ctx context.Context, logger *slog.Logger) context.Context {
 	loggerCtx := context.WithValue(ctx, contextKeyLogger, logger)
 	return loggerCtx
 }
 
-func Value(ctx context.Context) *slog.Logger {
+func Logger(ctx context.Context) *slog.Logger {
 	logger, ok := ctx.Value(contextKeyLogger).(*slog.Logger)
 	if !ok || logger == nil {
 		return slog.New(slognop.Handler{})
@@ -26,5 +26,5 @@ func Value(ctx context.Context) *slog.Logger {
 }
 
 func L(ctx context.Context) *slog.Logger {
-	return Value(ctx)
+	return Logger(ctx)
 }

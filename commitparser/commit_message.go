@@ -1,4 +1,4 @@
-package commitmsg
+package commitparser
 
 type CommitMessage struct {
 	Type     string

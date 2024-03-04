@@ -1,4 +1,4 @@
-package defaultlinter_test
+package linter_test
 
 import (
 	"context"
@@ -8,17 +8,18 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/somebadcode/commit-tool/commitlinter"
-	"github.com/somebadcode/commit-tool/commitlinter/defaultlinter"
+
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
+	"github.com/somebadcode/commit-tool/linter"
+	"github.com/somebadcode/commit-tool/traverser"
 )
 
 func TestLinter_Lint(t *testing.T) {
 	type fields struct {
 		Rev        plumbing.Revision
-		ReportFunc commitlinter.ReportFunc
-		StopFunc   commitlinter.StopFunc
-		Linter     commitlinter.Linter
+		ReportFunc traverser.ReportFunc
+		StopFunc   traverser.StopFunc
+		VisitFunc  traverser.VisitFunc
 	}
 
 	commitOpts := git.CommitOptions{
@@ -46,8 +47,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Filters: linter.Filters{
+						linter.FilterInitialCommit,
+					},
+				}.Lint,
 				StopFunc: func(commit *object.Commit) bool {
 					return false
 				},
@@ -63,8 +68,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Filters: linter.Filters{
+						linter.FilterInitialCommit,
+					},
+				}.Lint,
 			},
 		},
 		{
@@ -77,8 +86,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Filters: linter.Filters{
+						linter.FilterInitialCommit,
+					},
+				}.Lint,
 			},
 			wantErr: true,
 		},
@@ -88,8 +101,8 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("add foo", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Rev:       "HEAD",
+				VisitFunc: linter.Linter{}.Lint,
 			},
 			wantErr: true,
 		},
@@ -99,8 +112,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("woop: add foo", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Filters: linter.Filters{
+						linter.FilterInitialCommit,
+					},
+				}.Lint,
 			},
 		},
 		{
@@ -109,8 +126,8 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Rev:       "HEAD",
+				VisitFunc: linter.Linter{}.Lint,
 			},
 		},
 		{
@@ -119,8 +136,8 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Rev:       "HEAD",
+				VisitFunc: linter.Linter{}.Lint,
 			},
 		},
 		{
@@ -129,8 +146,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Rules: linter.Rules{
+						linter.RuleConventionalCommit,
+					},
+				}.Lint,
 			},
 			wantErr: true,
 		},
@@ -140,8 +161,12 @@ func TestLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Rev:    "HEAD",
-				Linter: defaultlinter.New(defaultlinter.WithRule(defaultlinter.RuleSubjectNoLeadingUpperCase)),
+				Rev: "HEAD",
+				VisitFunc: linter.Linter{
+					Rules: linter.Rules{
+						linter.RuleConventionalCommit,
+					},
+				}.Lint,
 			},
 			wantErr: true,
 		},
@@ -161,15 +186,15 @@ func TestLinter_Lint(t *testing.T) {
 				return
 			}
 
-			l := &commitlinter.CommitLinter{
+			l := &traverser.Traverser{
 				Repo:       repo,
 				Rev:        tt.fields.Rev,
 				ReportFunc: tt.fields.ReportFunc,
 				StopFunc:   tt.fields.StopFunc,
-				Linter:     tt.fields.Linter,
+				VisitFunc:  tt.fields.VisitFunc,
 			}
 
-			if err = l.Run(context.TODO()); (err != nil) != tt.wantErr {
+			if err = l.Run(context.Background()); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

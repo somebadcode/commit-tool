@@ -1,4 +1,4 @@
-package commitmsg
+package commitparser
 
 import (
 	"errors"
@@ -12,12 +12,12 @@ import (
 type stateFunc func(*parser) stateFunc
 
 type parser struct {
+	commit CommitMessage
+	err    error
 	msg    string
 	start  int
 	pos    int
 	size   int
-	commit CommitMessage
-	err    error
 	char   rune
 }
 
@@ -33,7 +33,7 @@ var (
 const (
 	TrailerKeyBreakingChangePrefix = "BREAKING"
 	TrailerKeyBreakingChange       = TrailerKeyBreakingChangePrefix + " CHANGE"
-	TrailerKeyBreakingChangeAlt    = "BREAKING-CHANGE"
+	TrailerKeyBreakingChangeAlt    = TrailerKeyBreakingChangePrefix + "-" + TrailerKeyBreakingChange
 )
 
 func Parse(message string) (CommitMessage, error) {
@@ -51,6 +51,10 @@ func (p *parser) parse() (CommitMessage, error) {
 			p.commit.Breaking = true
 			break
 		}
+	}
+
+	if len(p.commit.Trailers) == 0 {
+		p.commit.Trailers = nil
 	}
 
 	return p.commit, p.err

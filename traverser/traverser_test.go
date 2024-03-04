@@ -1,4 +1,4 @@
-package commitlinter_test
+package traverser_test
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commit-tool/commitlinter"
-	"github.com/somebadcode/commit-tool/commitlinter/defaultlinter"
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
+	"github.com/somebadcode/commit-tool/linter"
 	"github.com/somebadcode/commit-tool/slogctx"
 	"github.com/somebadcode/commit-tool/slognop"
+	"github.com/somebadcode/commit-tool/traverser"
 )
 
 func TestCommitLinter_Lint(t *testing.T) {
@@ -30,9 +30,9 @@ func TestCommitLinter_Lint(t *testing.T) {
 	type fields struct {
 		Rev        plumbing.Revision
 		OtherRev   plumbing.Revision
-		ReportFunc commitlinter.ReportFunc
-		StopFunc   commitlinter.StopFunc
-		Linter     commitlinter.Linter
+		ReportFunc traverser.ReportFunc
+		StopFunc   traverser.StopFunc
+		VisitFunc  traverser.VisitFunc
 	}
 
 	tests := []struct {
@@ -52,7 +52,11 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Linter: defaultlinter.New(defaultlinter.AllowInitialCommit()),
+				VisitFunc: linter.Linter{
+					Filters: linter.Filters{
+						linter.FilterInitialCommit,
+					},
+				}.Lint,
 			},
 		},
 		{
@@ -66,8 +70,8 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
 			},
 			fields: fields{
-				Linter:     defaultlinter.New(),
-				ReportFunc: commitlinter.SlogReporter(slognop.New()),
+				VisitFunc:  linter.Linter{}.Lint,
+				ReportFunc: traverser.SlogReporter(slognop.New()),
 			},
 			wantErr: true,
 		},
@@ -78,7 +82,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("add foo", commitOpts),
 			},
 			fields: fields{
-				Linter: defaultlinter.New(),
+				VisitFunc: linter.Linter{}.Lint,
 			},
 			wantErr: true,
 		},
@@ -90,8 +94,8 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("feat: add foo", commitOpts),
 			},
 			fields: fields{
-				Linter:   defaultlinter.New(),
-				StopFunc: commitlinter.StopAfterN(1),
+				VisitFunc: linter.Linter{}.Lint,
+				StopFunc:  traverser.StopAfterN(1),
 			},
 		},
 		{
@@ -105,8 +109,8 @@ func TestCommitLinter_Lint(t *testing.T) {
 				repobuilder.Commit("feat: add foo", commitOpts),
 			},
 			fields: fields{
-				Linter:   defaultlinter.New(),
-				OtherRev: "refs/heads/main",
+				VisitFunc: linter.Linter{}.Lint,
+				OtherRev:  "refs/heads/main",
 			},
 		},
 	}
@@ -127,22 +131,22 @@ func TestCommitLinter_Lint(t *testing.T) {
 				return
 			}
 
-			l := &commitlinter.CommitLinter{
+			l := &traverser.Traverser{
 				Repo:       repo,
 				Rev:        tt.fields.Rev,
 				OtherRev:   tt.fields.OtherRev,
 				ReportFunc: tt.fields.ReportFunc,
 				StopFunc:   tt.fields.StopFunc,
-				Linter:     tt.fields.Linter,
+				VisitFunc:  tt.fields.VisitFunc,
 			}
 
 			if err = l.Run(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 
-				var lintError commitlinter.LintError
+				var traverseError traverser.TraverseError
 
-				if errors.As(err, &lintError) {
-					t.Errorf("Run() error = %v", lintError)
+				if errors.As(err, &traverseError) {
+					t.Errorf("Run() error = %v", traverseError)
 				}
 			}
 		})

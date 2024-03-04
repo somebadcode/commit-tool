@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 
+	"github.com/somebadcode/commit-tool/commitslogvalue"
 	"github.com/spf13/cobra"
 
 	"github.com/somebadcode/commit-tool/slogctx"
@@ -30,7 +31,7 @@ var command = &cobra.Command{
 		opts := &slog.HandlerOptions{
 			AddSource:   addSource,
 			Level:       level,
-			ReplaceAttr: replaceAttr,
+			ReplaceAttr: commitslogvalue.ReplaceAttr,
 		}
 
 		handler := slog.NewJSONHandler(cmd.ErrOrStderr(), opts)

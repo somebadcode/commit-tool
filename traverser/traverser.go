@@ -1,4 +1,4 @@
-package commitlinter
+package traverser
 
 import (
 	"context"
@@ -16,30 +16,27 @@ import (
 
 type ReportFunc func(err error)
 type StopFunc func(commit *object.Commit) bool
+type VisitFunc func(commit *object.Commit) error
 
-type Linter interface {
-	Lint(commit *object.Commit) error
-}
-
-type CommitLinter struct {
-	// Repo is the repository whose commits should be linted.
+type Traverser struct {
+	// Repo is the repository whose commits should be traversed.
 	Repo *git.Repository
-	// Rev is the start of the linter. Defaults to HEAD.
+	// Rev is the revision of where to start the traversal at. Defaults to HEAD.
 	Rev plumbing.Revision
-	// OtherRev is the revision of a commit whose common ancestor the linting should stop at.
+	// OtherRev is the revision of a commit whose common ancestor the traversal should stop at.
 	OtherRev plumbing.Revision
-	// ReportFunc is called after each call to Linter if it returned an error.
+	// ReportFunc is called after each call to VisitFunc if it returned an error.
 	ReportFunc ReportFunc
-	// Linter is called for each commit.
-	Linter Linter
-	// StopFunc is called before Linter is called. Determines if the linting should stop.
+	// VisitFunc is called for each commit.
+	VisitFunc VisitFunc
+	// StopFunc is called before VisitFunc is called. Determines if the traversal should stop.
 	StopFunc StopFunc
 }
 
 var (
 	ErrRepositoryRequired = errors.New("repository is required")
 	ErrViolationsFound    = errors.New("violations found")
-	ErrNoLinter           = errors.New("no linter has been specified")
+	ErrNoVisitFunc        = errors.New("no traversal function")
 )
 
 // NoReporting will cause the linter to not report any of the lint errors, but the linter will still return an error
@@ -49,7 +46,7 @@ func NoReporting(_ error) {}
 // SlogReporter will log linter errors using [log/slog].
 func SlogReporter(logger *slog.Logger) ReportFunc {
 	return func(err error) {
-		var lintError LintError
+		var lintError TraverseError
 		if errors.As(err, &lintError) {
 			logger.LogAttrs(context.Background(), slog.LevelError, "bad commit message",
 				slog.String("hash", lintError.Hash.String()),
@@ -67,7 +64,7 @@ func SlogReporter(logger *slog.Logger) ReportFunc {
 	}
 }
 
-func setDefaults(l *CommitLinter) error {
+func setDefaults(l *Traverser) error {
 	if l.Rev == "" {
 		l.Rev = plumbing.Revision(plumbing.HEAD)
 	}
@@ -155,13 +152,13 @@ func StopAfterN(n uint) StopFunc {
 }
 
 // Validate will verify that required values are set and sets default values.
-func (l *CommitLinter) Validate() error {
+func (l *Traverser) Validate() error {
 	if l.Repo == nil {
 		return ErrRepositoryRequired
 	}
 
-	if l.Linter == nil {
-		return ErrNoLinter
+	if l.VisitFunc == nil {
+		return ErrNoVisitFunc
 	}
 
 	if err := setDefaults(l); err != nil {
@@ -171,8 +168,8 @@ func (l *CommitLinter) Validate() error {
 	return nil
 }
 
-// Run will traverse the commit tree, lint each commit message. The structure of the tree is ignored.
-func (l *CommitLinter) Run(ctx context.Context) error {
+// Run will traverse the commit tree, calls Traverser.VisitFunc for each commit message.
+func (l *Traverser) Run(ctx context.Context) error {
 	if err := l.Validate(); err != nil {
 		return err
 	}
@@ -205,7 +202,7 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 	err = iter.ForEach(func(commit *object.Commit) error {
 		if ctx.Err() != nil {
 			if logger.Enabled(ctx, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "cancelling linting",
+				logger.LogAttrs(ctx, slog.LevelDebug, "cancelling traversal",
 					slog.String("hash", commit.Hash.String()),
 					slog.String("cause", ctx.Err().Error()),
 				)
@@ -216,7 +213,7 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 
 		if l.StopFunc(commit) {
 			if logger.Enabled(ctx, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "stopping linting",
+				logger.LogAttrs(ctx, slog.LevelDebug, "stopping traversal",
 					slog.String("hash", commit.Hash.String()),
 				)
 			}
@@ -224,11 +221,11 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 			return storer.ErrStop
 		}
 
-		lintErr := l.Linter.Lint(commit)
-		if lintErr != nil {
+		err = l.VisitFunc(commit)
+		if err != nil {
 			errorCount += 1
 
-			l.ReportFunc(lintErr)
+			l.ReportFunc(err)
 
 			return nil
 		}
@@ -243,7 +240,7 @@ func (l *CommitLinter) Run(ctx context.Context) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("linter failed: %w", err)
+		return fmt.Errorf("failure: %w", err)
 	}
 
 	if errorCount > 0 {
