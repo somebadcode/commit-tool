@@ -1,10 +1,11 @@
 module github.com/somebadcode/commit-tool
 
-go 1.21
+go 1.22
 
 require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.11.0
+	github.com/google/go-cmp v0.6.0
 	github.com/spf13/cobra v1.8.0
 )
 

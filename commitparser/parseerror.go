@@ -1,4 +1,4 @@
-package commitmsg
+package commitparser
 
 import (
 	"fmt"
