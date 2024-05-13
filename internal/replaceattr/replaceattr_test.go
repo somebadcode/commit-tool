@@ -1,24 +1,32 @@
-package commitslogvalue_test
+package replaceattr_test
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/somebadcode/commit-tool/commitslogvalue"
+	"github.com/somebadcode/commit-tool/internal/replaceattr"
 )
+
+var stripTimeRegexp = regexp.MustCompile(`"time":"[-[:digit:]:.+T]+",`)
+var transformer = cmpopts.AcyclicTransformer("StripTime", func(v string) string {
+	return stripTimeRegexp.ReplaceAllString(v, "")
+})
 
 func TestCommit(t *testing.T) {
 	type args struct {
 		commit *object.Commit
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -62,10 +70,47 @@ func TestCommit(t *testing.T) {
 		},
 	}
 
-	stripTimeRegexp := regexp.MustCompile(`"time":"[-[:digit:]:.+T]+",`)
-	transformer := cmpopts.AcyclicTransformer("StripTime", func(v string) string {
-		return stripTimeRegexp.ReplaceAllString(v, "")
-	})
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf strings.Builder
+
+			l := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+				AddSource:   false,
+				Level:       slog.LevelDebug,
+				ReplaceAttr: replaceattr.ReplaceAttr,
+			}))
+
+			l.Debug(tt.name, slog.Any("commit", tt.args.commit))
+
+			if got := stripTimeRegexp.ReplaceAllString(strings.TrimSpace(buf.String()), ""); !cmp.Equal(got, tt.want, transformer) {
+				t.Errorf("Commit() = got %s", got)
+				t.Errorf("         =     %s", tt.want)
+			}
+		})
+	}
+}
+
+func TestErrors(t *testing.T) {
+	type args struct {
+		errs error
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			args: args{
+				errs: errors.Join(io.EOF, io.ErrUnexpectedEOF),
+			},
+			want: `{"level":"DEBUG","msg":"","error":["EOF","unexpected EOF"]}`,
+		},
+	}
 
 	t.Parallel()
 
@@ -78,13 +123,13 @@ func TestCommit(t *testing.T) {
 			l := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{
 				AddSource:   false,
 				Level:       slog.LevelDebug,
-				ReplaceAttr: commitslogvalue.ReplaceAttr,
+				ReplaceAttr: replaceattr.ReplaceAttr,
 			}))
 
-			l.Debug(tt.name, slog.Any("commit", tt.args.commit))
+			l.Debug(tt.name, slog.Any("error", tt.args.errs))
 
 			if got := stripTimeRegexp.ReplaceAllString(strings.TrimSpace(buf.String()), ""); !cmp.Equal(got, tt.want, transformer) {
-				t.Errorf("Commit() = got %s", got)
+				t.Errorf("Errors() = got %s", got)
 				t.Errorf("         =     %s", tt.want)
 			}
 		})

@@ -1,10 +1,14 @@
-package commitslogvalue
+package replaceattr
 
 import (
 	"log/slog"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
+
+type MultiError interface {
+	Unwrap() []error
+}
 
 func ReplaceAttr(_ []string, attr slog.Attr) slog.Attr {
 	switch attr.Value.Kind() {
@@ -14,12 +18,25 @@ func ReplaceAttr(_ []string, attr slog.Attr) slog.Attr {
 			attr.Value = Commit(attr.Value.Any().(*object.Commit))
 		case object.Signature:
 			attr.Value = Signature(attr.Value.Any().(object.Signature))
+		case MultiError:
+			attr.Value = Errors(attr.Value.Any().(MultiError).Unwrap())
+		case error:
+			attr.Value = slog.StringValue(attr.Value.Any().(error).Error())
 		}
 	default:
 		return attr
 	}
 
 	return attr
+}
+
+func Errors(errs []error) slog.Value {
+	values := make([]string, len(errs))
+	for i, err := range errs {
+		values[i] = err.Error()
+	}
+
+	return slog.AnyValue(values)
 }
 
 func Commit(commit *object.Commit) slog.Value {
