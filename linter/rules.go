@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
+
 	"github.com/somebadcode/commit-tool/commitparser"
 )
 

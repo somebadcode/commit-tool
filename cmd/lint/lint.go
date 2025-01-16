@@ -3,6 +3,8 @@ package lint
 import (
 	"context"
 	"fmt"
+	"github.com/somebadcode/commit-tool/slognop"
+	"log/slog"
 	"os"
 
 	"github.com/go-git/go-git/v5"
@@ -10,43 +12,52 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/somebadcode/commit-tool/linter"
-	"github.com/somebadcode/commit-tool/slogctx"
 	"github.com/somebadcode/commit-tool/traverser"
 )
 
 type Command struct {
-	Repository    string
-	Revision      plumbing.Revision
-	OtherRevision plumbing.Revision
+	RepositoryPath string
+	Revision       plumbing.Revision
+	OtherRevision  plumbing.Revision
+	Logger         *slog.Logger
 }
 
-func (cmd *Command) Execute(ctx context.Context, args []string) error {
-	var repoPath string
-	if len(args) == 1 {
-		repoPath = args[0]
-	} else {
-		wd, wdErr := os.Getwd()
-		if wdErr != nil {
-			return fmt.Errorf("repository path required")
+func (cmd *Command) Validate() error {
+	if cmd.Logger == nil {
+		cmd.Logger = slognop.New()
+	}
+
+	if cmd.RepositoryPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("repository path required: %w", err)
 		}
 
-		repoPath = wd
+		cmd.RepositoryPath = wd
+	}
+
+	return nil
+}
+
+func (cmd *Command) Execute(ctx context.Context) error {
+	if err := cmd.Validate(); err != nil {
+		return err
 	}
 
 	trav := traverser.Traverser{
 		Rev:        cmd.Revision,
 		OtherRev:   cmd.OtherRevision,
-		ReportFunc: traverser.SlogReporter(slogctx.L(ctx)),
+		ReportFunc: traverser.SlogReporter(cmd.Logger),
 		VisitFunc: linter.Linter{
 			Rules: linter.Rules{
 				linter.RuleConventionalCommit,
 			},
 		}.Lint,
+		Logger: cmd.Logger,
 	}
 
 	var err error
-
-	trav.Repo, err = git.PlainOpen(repoPath)
+	trav.Repo, err = git.PlainOpen(cmd.RepositoryPath)
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)
 	}
@@ -68,6 +79,20 @@ func (cmd *Command) Flags() []cli.Flag {
 			Category: "revision",
 			Usage:    "git revision to stop linting at",
 			Action:   revisionFlagAction(&cmd.Revision),
+		},
+		&cli.PathFlag{
+			Name:     "repository",
+			Category: "repository",
+			DefaultText: func() string {
+				s, _ := os.Getwd()
+				return s
+			}(),
+			Usage:       "path to git repository root directory",
+			Destination: &cmd.RepositoryPath,
+			Aliases:     []string{"repo"},
+			EnvVars:     nil,
+			TakesFile:   false,
+			Action:      nil,
 		},
 	}
 }

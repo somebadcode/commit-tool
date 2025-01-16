@@ -13,7 +13,6 @@ import (
 
 	"github.com/somebadcode/commit-tool/cmd/lint"
 	"github.com/somebadcode/commit-tool/internal/replaceattr"
-	"github.com/somebadcode/commit-tool/slogctx"
 )
 
 type StatusCode = int
@@ -39,7 +38,7 @@ func getAppInfo() AppInfo {
 }
 
 func Execute() StatusCode {
-	baseCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	level := &slog.LevelVar{}
@@ -51,11 +50,11 @@ func Execute() StatusCode {
 		ReplaceAttr: replaceattr.ReplaceAttr,
 	})
 
-	logger := slog.New(handler)
 	errWriter := slog.NewLogLogger(handler, slog.LevelError)
-	ctx := slogctx.Context(baseCtx, logger)
 
-	lintCommand := &lint.Command{}
+	lintCommand := &lint.Command{
+		Logger: slog.New(handler),
+	}
 
 	app := &cli.App{
 		Name:           filepath.Base(os.Args[0]),
@@ -77,7 +76,7 @@ func Execute() StatusCode {
 				return
 			}
 
-			slogctx.L(ctx).Error("application error",
+			lintCommand.Logger.Error("application error",
 				slog.Any("error", err),
 			)
 		},
@@ -97,10 +96,8 @@ func Execute() StatusCode {
 				Aliases:     []string{"linter"},
 				UsageText:   "lint [command options]",
 				Description: "lint git repository",
-				Args:        true,
-				ArgsUsage:   "[path]",
 				Action: func(c *cli.Context) error {
-					return lintCommand.Execute(c.Context, c.Args().Slice())
+					return lintCommand.Execute(c.Context)
 				},
 				Flags:                  lintCommand.Flags(),
 				UseShortOptionHandling: true,

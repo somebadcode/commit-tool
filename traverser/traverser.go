@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/somebadcode/commit-tool/slognop"
 	"log/slog"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
-
-	"github.com/somebadcode/commit-tool/slogctx"
 )
 
 type ReportFunc func(err error)
@@ -31,6 +30,8 @@ type Traverser struct {
 	VisitFunc VisitFunc
 	// StopFunc is called before VisitFunc is called. Determines if the traversal should stop.
 	StopFunc StopFunc
+
+	Logger *slog.Logger
 }
 
 var (
@@ -84,6 +85,10 @@ func setDefaults(l *Traverser) error {
 
 	if l.StopFunc == nil {
 		l.StopFunc = NoStop()
+	}
+
+	if l.Logger == nil {
+		l.Logger = slognop.New()
 	}
 
 	return nil
@@ -179,10 +184,8 @@ func (l *Traverser) Run(ctx context.Context) error {
 		return fmt.Errorf("unable to resolve revision: %w", err)
 	}
 
-	logger := slogctx.L(ctx)
-
-	if logger.Enabled(ctx, slog.LevelDebug) {
-		logger.LogAttrs(ctx, slog.LevelDebug, "resolved starting revision",
+	if l.Logger.Enabled(ctx, slog.LevelDebug) {
+		l.Logger.LogAttrs(ctx, slog.LevelDebug, "resolved starting revision",
 			slog.String("revision", l.Rev.String()),
 			slog.String("hash", hash.String()),
 		)
@@ -201,8 +204,8 @@ func (l *Traverser) Run(ctx context.Context) error {
 	var errorCount uint
 	err = iter.ForEach(func(commit *object.Commit) error {
 		if ctx.Err() != nil {
-			if logger.Enabled(ctx, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "cancelling traversal",
+			if l.Logger.Enabled(ctx, slog.LevelDebug) {
+				l.Logger.LogAttrs(ctx, slog.LevelDebug, "cancelling traversal",
 					slog.String("hash", commit.Hash.String()),
 					slog.String("cause", ctx.Err().Error()),
 				)
@@ -212,8 +215,8 @@ func (l *Traverser) Run(ctx context.Context) error {
 		}
 
 		if l.StopFunc(commit) {
-			if logger.Enabled(ctx, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "stopping traversal",
+			if l.Logger.Enabled(ctx, slog.LevelDebug) {
+				l.Logger.LogAttrs(ctx, slog.LevelDebug, "stopping traversal",
 					slog.String("hash", commit.Hash.String()),
 				)
 			}
@@ -230,8 +233,8 @@ func (l *Traverser) Run(ctx context.Context) error {
 			return nil
 		}
 
-		if logger.Enabled(ctx, slog.LevelDebug) {
-			logger.LogAttrs(ctx, slog.LevelDebug, "commit passed",
+		if l.Logger.Enabled(ctx, slog.LevelDebug) {
+			l.Logger.LogAttrs(ctx, slog.LevelDebug, "commit passed",
 				slog.Any("commit", commit),
 			)
 		}
