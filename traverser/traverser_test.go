@@ -12,7 +12,6 @@ import (
 
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
 	"github.com/somebadcode/commit-tool/linter"
-	"github.com/somebadcode/commit-tool/slogctx"
 	"github.com/somebadcode/commit-tool/slognop"
 	"github.com/somebadcode/commit-tool/traverser"
 )
@@ -117,8 +116,6 @@ func TestCommitLinter_Lint(t *testing.T) {
 
 	t.Parallel()
 
-	ctx := slogctx.Context(context.TODO(), slognop.New())
-
 	for _, tc := range tests {
 		tt := tc
 
@@ -128,6 +125,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 			repo, err := repobuilder.Build(tt.repoOps...)
 			if err != nil {
 				t.Errorf("failed to build repo: %v", err)
+
 				return
 			}
 
@@ -139,6 +137,9 @@ func TestCommitLinter_Lint(t *testing.T) {
 				StopFunc:   tt.fields.StopFunc,
 				VisitFunc:  tt.fields.VisitFunc,
 			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			if err = l.Run(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
