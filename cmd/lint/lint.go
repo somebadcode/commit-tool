@@ -3,7 +3,6 @@ package lint
 import (
 	"context"
 	"fmt"
-	"github.com/somebadcode/commit-tool/slognop"
 	"log/slog"
 	"os"
 
@@ -11,8 +10,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/urfave/cli/v2"
 
+	"github.com/somebadcode/commit-tool/commitlinter"
 	"github.com/somebadcode/commit-tool/linter"
-	"github.com/somebadcode/commit-tool/traverser"
 )
 
 type Command struct {
@@ -24,7 +23,7 @@ type Command struct {
 
 func (cmd *Command) Validate() error {
 	if cmd.Logger == nil {
-		cmd.Logger = slognop.New()
+		cmd.Logger = slog.New(slog.DiscardHandler)
 	}
 
 	if cmd.RepositoryPath == "" {
@@ -44,15 +43,15 @@ func (cmd *Command) Execute(ctx context.Context) error {
 		return err
 	}
 
-	trav := traverser.Traverser{
+	trav := linter.Linter{
 		Rev:        cmd.Revision,
 		OtherRev:   cmd.OtherRevision,
-		ReportFunc: traverser.SlogReporter(cmd.Logger),
-		VisitFunc: linter.Linter{
-			Rules: linter.Rules{
-				linter.RuleConventionalCommit,
+		ReportFunc: linter.SlogReporter(cmd.Logger),
+		CommitLinter: &commitlinter.Linter{
+			Rules: commitlinter.Rules{
+				commitlinter.RuleConventionalCommit,
 			},
-		}.Lint,
+		},
 		Logger: cmd.Logger,
 	}
 
