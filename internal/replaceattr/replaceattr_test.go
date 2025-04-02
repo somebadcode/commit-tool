@@ -2,6 +2,7 @@ package replaceattr_test
 
 import (
 	"errors"
+	"github.com/somebadcode/commit-tool/internal/replaceattr"
 	"io"
 	"log/slog"
 	"regexp"
@@ -13,11 +14,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-
-	"github.com/somebadcode/commit-tool/internal/replaceattr"
 )
 
-var stripTimeRegexp = regexp.MustCompile(`"time":"[-[:digit:]:.+T]+",`)
+var stripTimeRegexp = regexp.MustCompile(`"time":"[-[:digit:]:.+T]+Z?",`)
 var transformer = cmpopts.AcyclicTransformer("StripTime", func(v string) string {
 	return stripTimeRegexp.ReplaceAllString(v, "")
 })

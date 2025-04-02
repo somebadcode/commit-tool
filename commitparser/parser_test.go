@@ -361,7 +361,7 @@ func TestParse(t *testing.T) {
 func BenchmarkParse(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, _ = Parse(tt.args.message)
 			}
 		})
