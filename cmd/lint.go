@@ -29,8 +29,8 @@ import (
 
 type LintCommand struct {
 	Repository    *git.Repository   `kong:"arg,placeholder='path',default='.',help='repository to lint'"`
-	Revision      plumbing.Revision `kong:"name='rev',optional,default='HEAD',placeholder='revision',help='revision to start at'"`
-	OtherRevision plumbing.Revision `kong:"name='other',optional,placeholder='revision',help='revision (actual other) to stop at (exclusive)'"`
+	Revision      plumbing.Revision `kong:"name='revision',aliases='rev',optional,default='HEAD',placeholder='REVISION',help='revision to start at'"`
+	OtherRevision plumbing.Revision `kong:"name='other-revision',aliases='other',optional,placeholder='REVISION',help='revision (actual other) to stop at (exclusive)'"`
 }
 
 func (cmd *LintCommand) Run(ctx context.Context, l *slog.Logger) error {
