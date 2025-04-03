@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"github.com/somebadcode/commit-tool/internal/replaceattr"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/somebadcode/commit-tool/cmd/lint"
+	"github.com/somebadcode/commit-tool/internal/replaceattr"
 )
 
 type StatusCode = int
