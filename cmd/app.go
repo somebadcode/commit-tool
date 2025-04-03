@@ -42,11 +42,11 @@ const (
 )
 
 type CLI struct {
-	LogLevel  slog.LevelVar  `kong:"default='info',optional,placeholder='level',help='log level'"`
-	LogJSON   bool           `kong:"optional,help='log using JSON'"`
-	LogSource bool           `kong:"optional,hidden,help='log source (filename and line)'"`
-	Lint      LintCommand    `kong:"cmd,help='lint'"`
-	Version   VersionCommand `kong:"cmd,default='1',help='version'"`
+	LogLevel  slog.LevelVar  `kong:"group='logging',default='info',placeholder='level',env='LOG_LEVEL',help='log level'"`
+	LogJSON   bool           `kong:"group='logging',env='LOG_JSON',negatable,help='log using JSON'"`
+	LogSource bool           `kong:"group='logging',env='LOG_SOURCE',hidden,help='log source (filename and line)'"`
+	Lint      LintCommand    `kong:"cmd,help='lint the commit messages in a git repository'"`
+	Version   VersionCommand `kong:"cmd,default='1',help='show program version'"`
 }
 
 func Run() StatusCode {
@@ -57,6 +57,14 @@ func Run() StatusCode {
 
 	command := kong.Parse(&cli,
 		kong.TypeMapper(reflect.TypeOf((*git.Repository)(nil)), kongmappings.Repository()),
+		kong.Description("Commit Tool - a helpful tool for when you're working with git repositories"),
+		kong.ExplicitGroups([]kong.Group{
+			{
+				Key:         "logging",
+				Title:       "Logging",
+				Description: "Logging configuration",
+			},
+		}),
 	)
 
 	handlerOpts := &slog.HandlerOptions{
