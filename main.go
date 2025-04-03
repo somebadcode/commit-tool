@@ -14,5 +14,5 @@ import (
 var CopyrightNotice string
 
 func main() {
-	os.Exit(cmd.Execute())
+	os.Exit(cmd.Run())
 }

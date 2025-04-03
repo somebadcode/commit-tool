@@ -1,3 +1,20 @@
+/*
+ * Copyright 2025 Tobias Dahlberg
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Package cmd contains the command-line interface code.
 package cmd
 
 import (
@@ -5,108 +22,86 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"runtime/debug"
+	"reflect"
 	"syscall"
 
-	"github.com/urfave/cli/v2"
+	"github.com/alecthomas/kong"
+	"github.com/go-git/go-git/v5"
 
-	"github.com/somebadcode/commit-tool/cmd/lint"
 	"github.com/somebadcode/commit-tool/internal/replaceattr"
+	"github.com/somebadcode/commit-tool/kongmappings"
 )
 
 type StatusCode = int
 
 const (
 	StatusOK StatusCode = iota
+	StatusInternalError
+	StatusBadArguments
 	StatusFailure
 )
 
-type AppInfo struct {
-	Version string
+type CLI struct {
+	LogLevel  slog.LevelVar  `kong:"default='info',optional,placeholder='level',help='log level'"`
+	LogJSON   bool           `kong:"optional,help='log using JSON'"`
+	LogSource bool           `kong:"optional,hidden,help='log source (filename and line)'"`
+	Lint      LintCommand    `kong:"cmd,help='lint'"`
+	Version   VersionCommand `kong:"cmd,default='1',help='version'"`
 }
 
-func getAppInfo() AppInfo {
-	info, hasBuildInfo := debug.ReadBuildInfo()
-	if !hasBuildInfo {
-		panic("build information is missing")
-	}
-
-	return AppInfo{
-		Version: info.Main.Version,
-	}
-}
-
-func Execute() StatusCode {
+func Run() StatusCode {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	level := &slog.LevelVar{}
-	level.Set(slog.LevelInfo)
+	var cli CLI
 
-	handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		AddSource:   false,
-		Level:       level,
+	command := kong.Parse(&cli,
+		kong.TypeMapper(reflect.TypeOf((*git.Repository)(nil)), kongmappings.Repository()),
+	)
+
+	handlerOpts := &slog.HandlerOptions{
+		AddSource:   cli.LogSource,
+		Level:       &cli.LogLevel,
 		ReplaceAttr: replaceattr.ReplaceAttr,
-	})
-
-	errWriter := slog.NewLogLogger(handler, slog.LevelError)
-
-	lintCommand := &lint.Command{
-		Logger: slog.New(handler),
 	}
 
-	app := &cli.App{
-		Name:           filepath.Base(os.Args[0]),
-		Usage:          "A git commit tool",
-		DefaultCommand: "lint",
-		Reader:         os.Stdin,
-		Writer:         os.Stdout,
-		Authors: []*cli.Author{
-			{
-				Name:  "Tobias Dahlberg",
-				Email: "lokskada@live.se",
-			},
-		},
-		Version:              getAppInfo().Version,
-		EnableBashCompletion: true,
-		ErrWriter:            errWriter.Writer(),
-		ExitErrHandler: func(c *cli.Context, err error) {
-			if err == nil {
-				return
-			}
+	var handler slog.Handler
 
-			lintCommand.Logger.Error("application error",
-				slog.Any("error", err),
-			)
-		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "log-level",
-				Usage: "",
-				Value: "info",
-				Action: func(c *cli.Context, s string) error {
-					return level.UnmarshalText([]byte(s))
-				},
-			},
-		},
-		Commands: []*cli.Command{
-			{
-				Name:        "lint",
-				Aliases:     []string{"commitlinter"},
-				UsageText:   "lint [command options]",
-				Description: "lint git repository",
-				Action: func(c *cli.Context) error {
-					return lintCommand.Execute(c.Context)
-				},
-				Flags:                  lintCommand.Flags(),
-				UseShortOptionHandling: true,
-			},
-		},
+	switch {
+	case cli.LogJSON:
+		handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
+	default:
+		handler = slog.NewTextHandler(os.Stderr, handlerOpts)
 	}
 
-	err := app.RunContext(ctx, os.Args)
+	logger := slog.New(handler)
+
+	if err := command.Error; err != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "failed to parse arguments",
+			slog.String("error", err.Error()),
+		)
+
+		return StatusBadArguments
+	}
+
+	if err := command.ApplyDefaults(); err != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "failed to set default values",
+			slog.String("error", err.Error()),
+		)
+
+		return StatusInternalError
+	}
+
+	command.BindTo(ctx, (*context.Context)(nil))
+	command.Bind(logger)
+
+	err := command.Run()
 	if err != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "command failed",
+			slog.String("command", command.Command()),
+			slog.String("error", err.Error()),
+		)
+
 		return StatusFailure
 	}
 
