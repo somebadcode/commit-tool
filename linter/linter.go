@@ -29,7 +29,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 )
 
-type ReportFunc func(err error)
+type ReportFunc func(ctx context.Context, err error)
 type StopFunc func(commit *object.Commit) bool
 
 type CommitLinter interface {
@@ -152,7 +152,7 @@ func (l *Linter) Run(ctx context.Context) error {
 		if err != nil {
 			accumulatedErrs = append(accumulatedErrs, err)
 
-			l.ReportFunc(err)
+			l.ReportFunc(ctx, err)
 
 			return nil
 		}
@@ -237,14 +237,14 @@ func StopAfterN(n uint) StopFunc {
 
 // NoReporting will cause the linter to not report any of the lint errors, but the linter will still return an error
 // if any commit doesn't adhere to the linter's expectations.
-func NoReporting(_ error) {}
+func NoReporting(_ context.Context, _ error) {}
 
 // SlogReporter will log linter errors using [log/slog].
 func SlogReporter(logger *slog.Logger) ReportFunc {
-	return func(err error) {
+	return func(ctx context.Context, err error) {
 		var lintError LintError
 		if errors.As(err, &lintError) {
-			logger.LogAttrs(context.Background(), slog.LevelError, "bad commit message",
+			logger.LogAttrs(ctx, slog.LevelError, "bad commit message",
 				slog.String("hash", lintError.Hash.String()),
 				slog.Int("pos", lintError.Pos),
 				slog.String("err", errors.Unwrap(err).Error()),
@@ -253,7 +253,7 @@ func SlogReporter(logger *slog.Logger) ReportFunc {
 			return
 		}
 
-		logger.LogAttrs(context.Background(), slog.LevelError, "bad commit message",
+		logger.LogAttrs(ctx, slog.LevelError, "bad commit message",
 			slog.String("err", errors.Unwrap(err).Error()),
 		)
 	}
