@@ -50,6 +50,7 @@ type CLI struct {
 
 	// Commands:
 	Lint        LintCommand        `kong:"cmd,default='',help='lint the commit messages in a git repository'"`
+	NextVersion NextVersionCommand `kong:"cmd,help='get next version (lint is recommended prior to running this)'"`
 	Version     VersionCommand     `kong:"cmd,help='show program version'"`
 }
 
