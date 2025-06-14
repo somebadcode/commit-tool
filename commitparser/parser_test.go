@@ -149,29 +149,22 @@ var tests = []testCase{
 	{
 		name: "revert",
 		args: args{
-			message: "Revert \"feat: new stuff\"",
+			message: "revert: new stuff",
 		},
 		want: CommitMessage{
-			Type:    "feat",
+			Type:    "revert",
 			Subject: "new stuff",
 			Revert:  true,
 		},
 	},
 	{
-		name: "revert",
-		args: args{
-			message: "Revert feat: new stuff",
-		},
-		wantErr: true,
-	},
-	{
 		name: "merge",
 		args: args{
-			message: "Merge branch 'foo' into 'bar'",
+			message: "merge: branch 'foo' into 'bar'",
 		},
 		want: CommitMessage{
 			Type:    "merge",
-			Subject: "Merge branch 'foo' into 'bar'",
+			Subject: "branch 'foo' into 'bar'",
 			Merge:   true,
 		},
 	},

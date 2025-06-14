@@ -38,12 +38,11 @@ type parser struct {
 }
 
 var (
-	ErrInvalidType              = errors.New("invalid commit type")
-	ErrInvalidScope             = errors.New("invalid commit scope")
-	ErrInvalidSubject           = errors.New("invalid commit subject")
-	ErrInvalidMessage           = errors.New("invalid commit message")
-	ErrInvalidTrailer           = errors.New("invalid trailer in commit message")
-	ErrUnsupportedSpecialCommit = errors.New("unsupported special commit, please report this error if you think it should be supported")
+	ErrInvalidType    = errors.New("invalid commit type")
+	ErrInvalidScope   = errors.New("invalid commit scope")
+	ErrInvalidSubject = errors.New("invalid commit subject")
+	ErrInvalidMessage = errors.New("invalid commit message")
+	ErrInvalidTrailer = errors.New("invalid trailer in commit message")
 )
 
 const (
@@ -57,7 +56,7 @@ func Parse(message string) (CommitMessage, error) {
 }
 
 func (p *parser) parse() (CommitMessage, error) {
-	for state := parseSpecial(p); state != nil; state = state(p) {
+	for state := parseType(p); state != nil; state = state(p) {
 		// Simple state machine.
 	}
 
@@ -73,6 +72,13 @@ func (p *parser) parse() (CommitMessage, error) {
 		p.commit.Trailers = nil
 	}
 
+	switch p.commit.Type {
+	case "revert":
+		p.commit.Revert = true
+	case "merge":
+		p.commit.Merge = true
+	}
+
 	return p.commit, p.err
 }
 
@@ -83,57 +89,6 @@ func failParsing(p *parser, err error) stateFunc {
 	}
 
 	return nil
-}
-
-func parseSpecial(p *parser) stateFunc {
-	i := strings.IndexRune(p.msg, ' ')
-	if i <= 0 {
-		return failParsing(p, ErrInvalidType)
-	}
-
-	switch p.msg[:i] {
-	case "Merge":
-		return parseMerge
-	case "Revert":
-		return parseRevert
-	default:
-		return parseType
-	}
-}
-
-func parseRevert(p *parser) stateFunc {
-	r := p.acceptUntil(" ")
-	if r == utf8.RuneError {
-		return failParsing(p, ErrInvalidMessage)
-	}
-
-	if p.token() != "Revert" {
-		return failParsing(p, ErrInvalidMessage)
-	}
-
-	p.acceptUntil("\"")
-	if p.next() != '"' {
-		return failParsing(p, fmt.Errorf("expected a quotation mark (\") after \"Revert \": %w", ErrInvalidMessage))
-	}
-
-	p.commit.Revert = true
-
-	p.skip()
-
-	return parseType
-}
-
-func parseMerge(p *parser) stateFunc {
-	r := p.acceptUntil("\n")
-	if r == utf8.RuneError {
-		p.back()
-	}
-
-	p.commit.Merge = true
-	p.commit.Type = "merge"
-	p.commit.Subject = p.token()
-
-	return parseBody
 }
 
 func parseType(p *parser) stateFunc {
@@ -204,17 +159,6 @@ func parseSubject(p *parser) stateFunc {
 	r := p.acceptUntil("\n")
 	if r != utf8.RuneError {
 		p.back()
-	}
-
-	if p.commit.Revert {
-		token := p.token()
-		if !strings.HasSuffix(token, "\"") {
-			return failParsing(p, ErrUnsupportedSpecialCommit)
-		}
-
-		p.commit.Subject = token[:len(token)-1]
-
-		return parseBody
 	}
 
 	p.commit.Subject = p.token()
