@@ -28,6 +28,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/go-git/go-git/v5"
 
+	"github.com/somebadcode/commit-tool/cpuprofiler"
 	"github.com/somebadcode/commit-tool/internal/replaceattr"
 	"github.com/somebadcode/commit-tool/kongmappings"
 )
@@ -42,11 +43,14 @@ const (
 )
 
 type CLI struct {
-	LogLevel  slog.LevelVar  `kong:"group='logging',default='info',placeholder='level',env='LOG_LEVEL',help='log level'"`
-	LogJSON   bool           `kong:"group='logging',env='LOG_JSON',negatable,help='log using JSON'"`
-	LogSource bool           `kong:"group='logging',env='LOG_SOURCE',hidden,help='log source (filename and line)'"`
-	Lint      LintCommand    `kong:"cmd,help='lint the commit messages in a git repository'"`
-	Version   VersionCommand `kong:"cmd,default='1',help='show program version'"`
+	LogLevel   slog.LevelVar         `kong:"optional,group='logging',env='LOG_LEVEL',default='info',placeholder='level',help='log level'"`
+	LogJSON    bool                  `kong:"optional,group='logging',env='LOG_JSON',negatable,help='log using JSON'"`
+	LogSource  bool                  `kong:"optional,group='logging',env='LOG_SOURCE',hidden,help='log source (filename and line number)'"`
+	CPUProfile *cpuprofiler.Profiler `kong:"optional,hidden,help='profile cpu destination',placeholder='FILENAME'"`
+
+	// Commands:
+	Lint        LintCommand        `kong:"cmd,default='',help='lint the commit messages in a git repository'"`
+	Version     VersionCommand     `kong:"cmd,help='show program version'"`
 }
 
 func Run() StatusCode {
@@ -57,6 +61,7 @@ func Run() StatusCode {
 
 	command := kong.Parse(&cli,
 		kong.TypeMapper(reflect.TypeOf((*git.Repository)(nil)), kongmappings.Repository()),
+		kong.TypeMapper(reflect.TypeOf((*cpuprofiler.Profiler)(nil)), cpuprofiler.KongMapperFunc()),
 		kong.Description("Commit Tool - a helpful tool for when you're working with git repositories"),
 		kong.ExplicitGroups([]kong.Group{
 			{
@@ -98,6 +103,19 @@ func Run() StatusCode {
 		)
 
 		return StatusInternalError
+	}
+
+	if cli.CPUProfile != nil {
+		stopCPUProfiler, err := cli.CPUProfile.Start()
+		if err != nil {
+			logger.LogAttrs(ctx, slog.LevelError, "failed to start CPU profile",
+				slog.String("error", err.Error()),
+			)
+
+			return StatusFailure
+		}
+
+		defer stopCPUProfiler()
 	}
 
 	command.BindTo(ctx, (*context.Context)(nil))
