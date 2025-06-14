@@ -119,7 +119,7 @@ func Run() StatusCode {
 	}
 
 	command.BindTo(ctx, (*context.Context)(nil))
-	command.Bind(logger)
+	command.Bind(logger.With("logger", command.Selected().Name))
 
 	err := command.Run()
 	if err != nil {
