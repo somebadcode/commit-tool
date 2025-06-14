@@ -1,12 +1,17 @@
-.PHONY: build prerequisites check mod-check mod-download mod-tool-download mod-tool
+.PHONY: build prerequisites test check mod-check mod-download mod-tool-download mod-tool
 
 GOOSS = linux darwin windows
 ARCHS = amd64 arm64
 
-build: check build-linux-amd64 build-linux-arm64 build-darwin-arm64 build-darwin-amd64 build-windows-amd64 build-windows-arm64
+build: check test build-linux-amd64 build-linux-arm64 build-darwin-arm64 build-darwin-amd64 build-windows-amd64 build-windows-arm64
 
 prerequisites:
 	@if ! command -v go >/dev/null; then echo "Go is required! ( https://go.dev/dl/ )" && exit 1; fi
+
+test:
+	@echo Running unit tests...
+	@go test -cover -coverprofile=profile.cov -covermode=atomic ./...
+	@go tool cover -func profile.cov
 
 check: prerequisites mod-check mod-download
 	@echo Vetting code...
