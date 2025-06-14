@@ -50,11 +50,6 @@ func (l Linter) Lint(commit *object.Commit) error {
 		return err
 	}
 
-	// TODO: Add support for linting revert and merge commits.
-	if msg.Revert || msg.Merge {
-		return nil
-	}
-
 	if err = l.Rules.Validate(msg, commit); err != nil {
 		return linter.LintError{
 			Err:  err,

@@ -25,6 +25,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/somebadcode/commit-tool/commitlinter"
+	"github.com/somebadcode/commit-tool/commitlinter/conventionalcommits"
 	"github.com/somebadcode/commit-tool/internal/repobuilder"
 	"github.com/somebadcode/commit-tool/linter"
 )
@@ -154,6 +155,7 @@ func TestLinter_Lint(t *testing.T) {
 				Rev:    "HEAD",
 				Linter: &commitlinter.Linter{},
 			},
+			wantErr: true,
 		},
 		{
 			repoOps: []repobuilder.OperationFunc{
@@ -164,7 +166,7 @@ func TestLinter_Lint(t *testing.T) {
 				Rev: "HEAD",
 				Linter: &commitlinter.Linter{
 					Rules: commitlinter.Rules{
-						commitlinter.RuleConventionalCommit,
+						conventionalcommits.Verify,
 					},
 				},
 			},
@@ -179,7 +181,22 @@ func TestLinter_Lint(t *testing.T) {
 				Rev: "HEAD",
 				Linter: &commitlinter.Linter{
 					Rules: commitlinter.Rules{
-						commitlinter.RuleConventionalCommit,
+						conventionalcommits.Verify,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			repoOps: []repobuilder.OperationFunc{
+				repobuilder.Commit("apple(worm): do not eat", commitOpts),
+				repobuilder.Commit("chore(foo): fixed formatting", commitOpts),
+			},
+			fields: fields{
+				Rev: "HEAD",
+				Linter: &commitlinter.Linter{
+					Rules: commitlinter.Rules{
+						conventionalcommits.Verify,
 					},
 				},
 			},
@@ -211,6 +228,10 @@ func TestLinter_Lint(t *testing.T) {
 
 			if err = l.Run(t.Context()); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+
+				for _, errParse := range err.(interface{ Unwrap() []error }).Unwrap() {
+					t.Error(errParse)
+				}
 			}
 		})
 	}
