@@ -35,6 +35,7 @@ import (
 
 var (
 	ErrRepositoryRequired = errors.New("repository is required")
+	ErrRevIsAlreadyTagged = errors.New("selected revision already has a tag")
 )
 
 type NextVersion struct {
@@ -93,6 +94,11 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 	tags, err = findTags(ctx, nv.Repository)
 	if err != nil {
 		return fmt.Errorf("could not find tags: %w", err)
+	}
+
+	// There's no next version if the selected revision already has a version tag.
+	if _, exists := tags[*hash]; exists {
+		return ErrRevIsAlreadyTagged
 	}
 
 	if len(tags) > 0 && nv.Logger.Enabled(ctx, slog.LevelDebug) {
