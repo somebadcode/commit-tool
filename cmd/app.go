@@ -19,9 +19,9 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/go-git/go-git/v5"
 
-	"github.com/somebadcode/commit-tool/cpuprofiler"
-	"github.com/somebadcode/commit-tool/internal/replaceattr"
-	"github.com/somebadcode/commit-tool/kongmappings"
+	"codeberg.org/somebadcode/commit-tool/cpuprofiler"
+	"codeberg.org/somebadcode/commit-tool/internal/replaceattr"
+	"codeberg.org/somebadcode/commit-tool/kongmappings"
 )
 
 type StatusCode = int

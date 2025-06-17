@@ -11,7 +11,7 @@ import (
 	_ "embed"
 	"os"
 
-	"github.com/somebadcode/commit-tool/cmd"
+	"codeberg.org/somebadcode/commit-tool/cmd"
 )
 
 func main() {

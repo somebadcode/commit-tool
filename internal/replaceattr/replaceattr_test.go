@@ -21,7 +21,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/somebadcode/commit-tool/internal/replaceattr"
+	"codeberg.org/somebadcode/commit-tool/internal/replaceattr"
 )
 
 var stripTimeRegexp = regexp.MustCompile(`"time":"[-[:digit:]:.+T]+Z?",`)

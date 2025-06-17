@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commit-tool/commitparser"
+	"codeberg.org/somebadcode/commit-tool/commitparser"
 )
 
 type FilterFunc func(message commitparser.CommitMessage, commit *object.Commit, err error) error

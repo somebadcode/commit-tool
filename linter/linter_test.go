@@ -18,9 +18,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commit-tool/commitlinter"
-	"github.com/somebadcode/commit-tool/internal/repobuilder"
-	"github.com/somebadcode/commit-tool/linter"
+	"codeberg.org/somebadcode/commit-tool/commitlinter"
+	"codeberg.org/somebadcode/commit-tool/internal/repobuilder"
+	"codeberg.org/somebadcode/commit-tool/linter"
 )
 
 func TestCommitLinter_Lint(t *testing.T) {

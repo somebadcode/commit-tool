@@ -12,8 +12,8 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commit-tool/commitparser"
-	"github.com/somebadcode/commit-tool/linter"
+	"codeberg.org/somebadcode/commit-tool/commitparser"
+	"codeberg.org/somebadcode/commit-tool/linter"
 )
 
 type Linter struct {

@@ -21,7 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
-	"github.com/somebadcode/commit-tool/commitparser"
+	"codeberg.org/somebadcode/commit-tool/commitparser"
 )
 
 var (

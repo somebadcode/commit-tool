@@ -15,8 +15,8 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/somebadcode/commit-tool/commitlinter"
-	"github.com/somebadcode/commit-tool/commitparser"
+	"codeberg.org/somebadcode/commit-tool/commitlinter"
+	"codeberg.org/somebadcode/commit-tool/commitparser"
 )
 
 var conventionalTypes = map[string]struct{}{

@@ -14,9 +14,9 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 
-	"github.com/somebadcode/commit-tool/commitlinter"
-	"github.com/somebadcode/commit-tool/commitlinter/conventionalcommits"
-	"github.com/somebadcode/commit-tool/linter"
+	"codeberg.org/somebadcode/commit-tool/commitlinter"
+	"codeberg.org/somebadcode/commit-tool/commitlinter/conventionalcommits"
+	"codeberg.org/somebadcode/commit-tool/linter"
 )
 
 type LintCommand struct {

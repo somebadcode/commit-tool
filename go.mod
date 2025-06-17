@@ -1,4 +1,4 @@
-module github.com/somebadcode/commit-tool
+module codeberg.org/somebadcode/commit-tool
 
 go 1.24
 
