@@ -8,7 +8,6 @@
 package main
 
 import (
-	_ "embed"
 	"os"
 
 	"codeberg.org/somebadcode/commit-tool/cmd"
