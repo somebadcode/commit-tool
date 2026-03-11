@@ -20,8 +20,8 @@ type stateFunc func(*parser) stateFunc
 
 type parser struct {
 	commit CommitMessage
-	err    error
 	msg    string
+	err    error
 	start  int
 	pos    int
 	size   int

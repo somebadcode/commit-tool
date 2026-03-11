@@ -151,9 +151,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 			if err = l.Run(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 
-				var lintError linter.LintError
-
-				if errors.As(err, &lintError) {
+				if lintError, ok := errors.AsType[linter.LintError](err); ok {
 					t.Errorf("Run() error = %v", lintError)
 				}
 			}

@@ -9,6 +9,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/go-git/go-git/v5"
@@ -39,5 +40,10 @@ func (cmd *LintCommand) Run(ctx context.Context, l *slog.Logger) error {
 		Logger: l,
 	}
 
-	return lint.Run(ctx)
+	err := lint.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("lint failed: %w", err)
+	}
+
+	return nil
 }

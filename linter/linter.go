@@ -233,8 +233,7 @@ func NoReporting(_ context.Context, _ error) {}
 // SlogReporter will log linter errors using [log/slog].
 func SlogReporter(logger *slog.Logger) ReportFunc {
 	return func(ctx context.Context, err error) {
-		var lintError LintError
-		if errors.As(err, &lintError) {
+		if lintError, ok := errors.AsType[LintError](err); ok {
 			logger.LogAttrs(ctx, slog.LevelError, "bad commit message",
 				slog.String("hash", lintError.Hash.String()),
 				slog.Int("pos", lintError.Pos),

@@ -9,6 +9,7 @@ package commitlinter
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
@@ -29,20 +30,19 @@ func (l Linter) Lint(commit *object.Commit) error {
 			return nil
 		}
 
-		var parseError commitparser.ParseError
-		if errors.As(err, &parseError) {
-			return linter.LintError{
+		if parseError, ok := errors.AsType[commitparser.ParseError](err); ok {
+			return &linter.LintError{
 				Err:  parseError,
 				Hash: commit.Hash,
 				Pos:  parseError.Pos,
 			}
 		}
 
-		return err
+		return fmt.Errorf("could not parse commit message: %w", err)
 	}
 
 	if err = l.Rules.Validate(msg, commit); err != nil {
-		return linter.LintError{
+		return &linter.LintError{
 			Err:  err,
 			Hash: commit.Hash,
 		}

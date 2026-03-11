@@ -55,5 +55,10 @@ func (cmd *NextVersionCommand) Run(ctx context.Context, l *slog.Logger) error {
 		Logger:     l,
 	}
 
-	return next.Run(ctx)
+	err := next.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to run next version: %w", err)
+	}
+
+	return nil
 }

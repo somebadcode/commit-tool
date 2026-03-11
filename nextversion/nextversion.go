@@ -14,6 +14,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-git/go-git/v5"
@@ -30,12 +31,12 @@ var (
 )
 
 type NextVersion struct {
+	Logger     *slog.Logger
 	Repository *git.Repository
 	Revision   plumbing.Revision
-	Writer     io.Writer
-	Logger     *slog.Logger
 	Prerelease string
 	Metadata   string
+	Writer     io.Writer
 	VSuffix    bool
 }
 
@@ -93,11 +94,27 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 	}
 
 	if len(tags) > 0 && nv.Logger.Enabled(ctx, slog.LevelDebug) {
-		attrs := make([]slog.Attr, len(tags))
+		attrs := make([]slog.Attr, 0, len(tags))
 
 		for h, v := range tags {
 			attrs = append(attrs, slog.String(v.String(), h.String()))
 		}
+
+		slices.SortFunc(attrs, func(a, b slog.Attr) int {
+			var v1, v2 *semver.Version
+
+			v1, err = semver.NewVersion(a.Key)
+			if err != nil {
+				panic(err)
+			}
+
+			v2, err = semver.NewVersion(b.Key)
+			if err != nil {
+				panic(err)
+			}
+
+			return v1.Compare(v2)
+		})
 
 		nv.Logger.LogAttrs(ctx, slog.LevelDebug, "discovered tags",
 			slog.Any("tags", slog.GroupValue(attrs...)),
@@ -155,10 +172,15 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 		version = semver.MustParse("0.0.0")
 	}
 
+	// If the major version is zero then breaking changes are acceptable and should not increment major version.
+	if version.Major() == 0 {
+		major = false
+	}
+
 	switch {
-	case major && version.Major() > 0:
+	case major:
 		*version = version.IncMajor()
-	case minor || (major && version.Major() > 0):
+	case minor:
 		*version = version.IncMinor()
 	case patch:
 		*version = version.IncPatch()
@@ -216,7 +238,7 @@ func findTags(ctx context.Context, repo *git.Repository) (map[plumbing.Hash]*sem
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not iterate tags: %w", err)
 	}
 
 	return tags, nil
