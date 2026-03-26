@@ -1,8 +1,8 @@
 /*
- * This file is part of commit-tool which is released under EUPL 1.2.
- * See the file LICENSE in the repository root for full license details.
- *
  * SPDX-License-Identifier: EUPL-1.2
+ * SPDX-License-Name: European Union Public License 1.2
+ *
+ * See the NOTICE and LICENSE files in the repository root for attribution and full license details.
  */
 
 package commitparser

@@ -1,2 +1,31 @@
+# Credits and Licenses
+
+This project is licensed under the EUPL 1.2.
+For more information, see the LICENSE file.
+
 SPDX-FileCopyrightText: Copyright © 2025 Tobias Dahlberg <lokskada@live.se>
 SPDX-License-Identifier: EUPL-1.2
+
+## Third-party Dependencies
+
+This software uses the following external modules:
+
+* **go-git** (https://github.com/go-git/go-git/)
+  Licensed under the Apache License 2.0
+  Copyright (c) the go-git project and contributors
+
+* **go-billy** (https://github.com/go-git/go-billy/)
+  Licensed under the Apache License 2.0
+  Copyright (c) the go-git project and contributors
+
+* **kong** (https://github.com/alecthomas/kong)
+  Licensed under the MIT License
+  Copyright (c) Alec Thomas and contributors
+
+* **go-cmp** (https://github.com/google/go-cmp/)
+  Licensed under BSD 3-Clause "New" or "Revised" License
+  Copyright (c) The Go Authors and contributors
+
+* **semver** (https://github.com/Masterminds/semver)
+  Licensed under the MIT License
+  Copyright (c) Masterminds and contributors
