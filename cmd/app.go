@@ -110,8 +110,14 @@ func Run() StatusCode {
 		defer stopCPUProfiler()
 	}
 
+	selected := command.Selected()
+	if selected == nil {
+		logger.LogAttrs(ctx, slog.LevelError, "no command selected")
+		return StatusBadArguments
+	}
+
 	command.BindTo(ctx, (*context.Context)(nil))
-	command.Bind(logger.With("logger", command.Selected().Name))
+	command.Bind(logger.With("logger", selected.Name))
 
 	err := command.Run()
 	if err != nil {
