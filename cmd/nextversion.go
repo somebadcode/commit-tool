@@ -24,9 +24,9 @@ type NextVersionCommand struct {
 	Repository     *git.Repository   `kong:"arg,placeholder='path',default='.',help='repository to lint'"`
 	Revision       plumbing.Revision `kong:"arg,name='revision',aliases='rev',optional,default='HEAD',placeholder='REVISION',help='revision to start at'"`
 	Output         string            `kong:"arg,type='path',default='-',help='where to output the next version'"`
-	VSuffix        bool              `kong:"default='true',negatable,help='output with v-suffix, i.e. v1.3.2'"`
-	WithPrerelease string            `kong:"optional,help='add prerelease information to tag'"`
-	WithMetadata   string            `kong:"optional,help='add metadata to tag'"`
+	VSuffix        bool              `kong:"default='false',negatable,help='output with v-suffix, i.e. v1.3.2'"`
+	WithPrerelease []string          `kong:"optional,help='add prerelease information to tag'"`
+	WithMetadata   []string          `kong:"optional,help='add metadata to tag'"`
 }
 
 func (cmd *NextVersionCommand) Run(ctx context.Context, l *slog.Logger) error {
