@@ -17,9 +17,13 @@ import (
 	"codeberg.org/somebadcode/commit-tool/linter"
 )
 
+type Validator interface {
+	Validate(commitparser.CommitMessage, *object.Commit) error
+}
+
 type Linter struct {
-	Filters Filters
-	Rules   Rules
+	Filters   Filters
+	Validator Validator
 }
 
 // Lint commit to ensures that it adheres to Conventional Commits 1.0.0.
@@ -41,7 +45,12 @@ func (l Linter) Lint(commit *object.Commit) error {
 		return fmt.Errorf("could not parse commit message: %w", err)
 	}
 
-	if err = l.Rules.Validate(msg, commit); err != nil {
+	if l.Validator == nil {
+		return nil
+	}
+
+	err = l.Validator.Validate(msg, commit)
+	if err != nil {
 		return &linter.LintError{
 			Err:  err,
 			Hash: commit.Hash,

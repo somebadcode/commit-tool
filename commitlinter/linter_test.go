@@ -156,9 +156,7 @@ func TestLinter_Lint(t *testing.T) {
 			fields: fields{
 				Rev: "HEAD",
 				Linter: &commitlinter.Linter{
-					Rules: commitlinter.Rules{
-						conventionalcommits.Verify,
-					},
+					Validator: conventionalcommits.New(conventionalcommits.Settings{}),
 				},
 			},
 			wantErr: true,
@@ -171,9 +169,7 @@ func TestLinter_Lint(t *testing.T) {
 			fields: fields{
 				Rev: "HEAD",
 				Linter: &commitlinter.Linter{
-					Rules: commitlinter.Rules{
-						conventionalcommits.Verify,
-					},
+					Validator: conventionalcommits.New(conventionalcommits.Settings{}),
 				},
 			},
 			wantErr: true,
@@ -186,9 +182,7 @@ func TestLinter_Lint(t *testing.T) {
 			fields: fields{
 				Rev: "HEAD",
 				Linter: &commitlinter.Linter{
-					Rules: commitlinter.Rules{
-						conventionalcommits.Verify,
-					},
+					Validator: conventionalcommits.New(conventionalcommits.Settings{}),
 				},
 			},
 			wantErr: true,

@@ -33,9 +33,7 @@ func (cmd *LintCommand) Run(ctx context.Context, l *slog.Logger) error {
 		OtherRev:   cmd.OtherRevision,
 		ReportFunc: linter.SlogReporter(l),
 		CommitLinter: &commitlinter.Linter{
-			Rules: commitlinter.Rules{
-				conventionalcommits.Verify,
-			},
+			Validator: conventionalcommits.New(conventionalcommits.Settings{}),
 		},
 		Logger: l,
 	}
