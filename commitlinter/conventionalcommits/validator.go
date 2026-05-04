@@ -69,9 +69,7 @@ func (v *Validator) ValidateSubject(msg commitparser.CommitMessage, _ *object.Co
 	}
 
 	first, size := utf8.DecodeRuneInString(msg.Subject)
-	if first == utf8.RuneError && size == 0 {
-		return fmt.Errorf("subject must not be empty: %w", ErrInvalidSubject)
-	} else if first == utf8.RuneError && size == 1 {
+	if first == utf8.RuneError {
 		return fmt.Errorf("bad subject: %w", ErrInvalidCharacter)
 	}
 
@@ -86,9 +84,7 @@ func (v *Validator) ValidateSubject(msg commitparser.CommitMessage, _ *object.Co
 	var last rune
 
 	last, size = utf8.DecodeLastRuneInString(msg.Subject)
-	if last == utf8.RuneError && size == 0 {
-		return fmt.Errorf("unexpectedly short subject: %w", ErrInvalidSubject)
-	} else if last == utf8.RuneError && size == 1 {
+	if last == utf8.RuneError && size == 1 {
 		return fmt.Errorf("bad subject: %w", ErrInvalidCharacter)
 	}
 

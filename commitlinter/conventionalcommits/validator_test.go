@@ -38,6 +38,25 @@ func TestValidate(t *testing.T) {
 					Subject: "big change",
 				},
 			},
+			fields: fields{
+				settings: Settings{
+					MaxHeaderLength: DefaultMaxHeaderLength,
+				},
+			},
+		},
+		{
+			args: args{
+				msg: commitparser.CommitMessage{
+					Type:    "feat",
+					Subject: "this message is too long and the validator should confirm that's the case",
+				},
+			},
+			fields: fields{
+				settings: Settings{
+					MaxHeaderLength: DefaultMaxHeaderLength,
+				},
+			},
+			wantErr: true,
 		},
 		{
 			args: args{
@@ -46,12 +65,22 @@ func TestValidate(t *testing.T) {
 					Subject: "big change",
 				},
 			},
+			fields: fields{
+				settings: Settings{
+					MaxHeaderLength: DefaultMaxHeaderLength,
+				},
+			},
 			wantErr: true,
 		},
 		{
 			args: args{
 				msg: commitparser.CommitMessage{
 					Type: "feat",
+				},
+			},
+			fields: fields{
+				settings: Settings{
+					MaxHeaderLength: DefaultMaxHeaderLength,
 				},
 			},
 			wantErr: true,
@@ -64,6 +93,11 @@ func TestValidate(t *testing.T) {
 					Subject: "foo bar baz",
 				},
 			},
+			fields: fields{
+				settings: Settings{
+					MaxHeaderLength: DefaultMaxHeaderLength,
+				},
+			},
 			wantErr: true,
 		},
 	}
@@ -72,9 +106,7 @@ func TestValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := Validator{
-				settings: tt.fields.settings,
-			}
+			v := New(tt.fields.settings)
 
 			err := v.Validate(tt.args.msg, tt.args.commit)
 			if (err != nil) != tt.wantErr {
