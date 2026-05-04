@@ -169,7 +169,7 @@ func (nv *NextVersion) ComputeNextVersion(ctx context.Context, tags map[plumbing
 		return nil, fmt.Errorf("failed to calculate next version: %w", err)
 	}
 
-	updateVersion(&version, classification)
+	version = DetermineNextVersion(&version, classification)
 
 	if nv.Prerelease != nil {
 		err = version.SetPrerelease(nv.Prerelease...)
@@ -188,7 +188,21 @@ func (nv *NextVersion) ComputeNextVersion(ctx context.Context, tags map[plumbing
 	return &version, nil
 }
 
-func updateVersion(version *semver.Version, classification classifier.Classification) {
+func DetermineNextVersion(v *semver.Version, classification classifier.Classification) semver.Version {
+	version := v.Clone()
+
+	if len(version.Prerelease) > 0 {
+		isPreMajor := version.Major >= 1 && version.Minor == 0 && version.Patch == 0
+
+		version.Finalize()
+
+		if classification == classifier.Major && !isPreMajor && version.Major >= 1 {
+			version.IncreaseMajor()
+		}
+
+		return version
+	}
+
 	switch classification {
 	case classifier.Major:
 		// If the major version is zero then breaking changes are acceptable and should not increment major version.
@@ -208,6 +222,8 @@ func updateVersion(version *semver.Version, classification classifier.Classifica
 	case classifier.None:
 		// Do nothing.
 	}
+
+	return version
 }
 
 func tagsAsMap(ctx context.Context, repo *git.Repository) (map[plumbing.Hash]semver.Version, error) {
