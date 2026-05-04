@@ -109,3 +109,25 @@ func Commit(message string, options git.CommitOptions) OperationFunc {
 		return nil
 	}
 }
+
+func Tag(tag string, options *git.CreateTagOptions) OperationFunc {
+	return func(repo *git.Repository, worktree *git.Worktree) error {
+		head, err := repo.Head()
+		if err != nil {
+			return fmt.Errorf("failed to get HEAD: %w", err)
+		}
+
+		if options != nil {
+			if err = options.Validate(repo, head.Hash()); err != nil {
+				return fmt.Errorf("invalid options: %w", err)
+			}
+		}
+
+		_, err = repo.CreateTag(tag, head.Hash(), options)
+		if err != nil {
+			return fmt.Errorf("failed to tag %q: %w", tag, err)
+		}
+
+		return nil
+	}
+}

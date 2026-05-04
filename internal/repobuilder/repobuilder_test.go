@@ -27,6 +27,10 @@ func ExampleBuild() {
 
 	repo, err := repobuilder.Build(
 		repobuilder.Commit("initial commit", commitOpts),
+		repobuilder.Tag("0.1.0", &git.CreateTagOptions{
+			Tagger:  commitOpts.Author,
+			Message: "Release 0.1.0",
+		}),
 		repobuilder.CheckoutBranch("test"),
 		repobuilder.Commit("test: something", commitOpts),
 		repobuilder.Commit("fix: foo is bar", commitOpts),
