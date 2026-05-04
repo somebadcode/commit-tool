@@ -225,13 +225,35 @@ func tagsAsMap(ctx context.Context, repo *git.Repository) (map[plumbing.Hash]sem
 			return ctx.Err()
 		}
 
+		if tag, _ := repo.TagObject(ref.Hash()); tag != nil {
+			var v semver.Version
+			v, err = semver.Parse(tag.Name)
+			if err != nil {
+				return nil
+			}
+
+			tags[tag.Target] = v
+
+			return nil
+		}
+
 		var v semver.Version
 		v, err = semver.Parse(ref.Name().Short())
 		if err != nil {
 			return nil
 		}
 
-		tags[ref.Hash()] = v
+		prev := tags[ref.Hash()]
+		if prev.IsZero() {
+			tags[ref.Hash()] = v
+
+			return nil
+		}
+
+		i := semver.Compare(v, prev)
+		if i > 0 {
+			tags[ref.Hash()] = v
+		}
 
 		return nil
 	})
