@@ -14,13 +14,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"slices"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
+	"codeberg.org/somebadcode/commit-tool/classifier"
 	"codeberg.org/somebadcode/commit-tool/commitparser"
 	"codeberg.org/somebadcode/commit-tool/semver"
 )
@@ -31,13 +31,14 @@ var (
 )
 
 type NextVersion struct {
-	Logger     *slog.Logger
-	Repository *git.Repository
-	Revision   plumbing.Revision
-	Prerelease []string
-	Metadata   []string
-	Writer     io.Writer
-	VSuffix    bool
+	Logger           *slog.Logger
+	Repository       *git.Repository
+	Revision         plumbing.Revision
+	Prerelease       []string
+	Metadata         []string
+	Writer           io.Writer
+	CommitClassifier *classifier.Classifier
+	VSuffix          bool
 }
 
 func (nv *NextVersion) Validate() error {
@@ -57,6 +58,10 @@ func (nv *NextVersion) Validate() error {
 		nv.Writer = os.Stdout
 	}
 
+	if nv.CommitClassifier == nil {
+		nv.CommitClassifier, _ = classifier.New(nil)
+	}
+
 	return nil
 }
 
@@ -70,20 +75,9 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to resolve revision %q: %w", nv.Revision, err)
 	}
 
-	var iter object.CommitIter
-
-	iter, err = nv.Repository.Log(&git.LogOptions{
-		From:  *hash,
-		Order: git.LogOrderBSF,
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not iterate over commits: %w", err)
-	}
-
 	var tags map[plumbing.Hash]semver.Version
 
-	tags, err = findTags(ctx, nv.Repository)
+	tags, err = tagsAsMap(ctx, nv.Repository)
 	if err != nil {
 		return fmt.Errorf("could not find tags: %w", err)
 	}
@@ -96,45 +90,62 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 	if len(tags) > 0 && nv.Logger.Enabled(ctx, slog.LevelDebug) {
 		attrs := make([]slog.Attr, 0, len(tags))
 
-		for h, v := range tags {
-			attrs = append(attrs, slog.String(v.String(), h.String()))
+		for k, v := range tags {
+			attrs = append(attrs, slog.String(v.String(), k.String()))
 		}
-
-		slices.SortFunc(attrs, func(a, b slog.Attr) int {
-			var v1, v2 semver.Version
-
-			v1, err = semver.Parse(a.Key)
-			if err != nil {
-				panic(err)
-			}
-
-			v2, err = semver.Parse(b.Key)
-			if err != nil {
-				panic(err)
-			}
-
-			return semver.Compare(v1, v2)
-		})
 
 		nv.Logger.LogAttrs(ctx, slog.LevelDebug, "discovered tags",
 			slog.Any("tags", slog.GroupValue(attrs...)),
 		)
 	}
 
-	var major, minor, patch bool
+	var version *semver.Version
+
+	version, err = nv.ComputeNextVersion(ctx, tags)
+	if err != nil {
+		return err
+	}
+
+	_, err = nv.Writer.Write([]byte(version.String()))
+	if err != nil {
+		return fmt.Errorf("could not write next version: %w", err)
+	}
+
+	return nil
+}
+
+func (nv *NextVersion) ComputeNextVersion(ctx context.Context, tags map[plumbing.Hash]semver.Version) (*semver.Version, error) {
+	hash, err := nv.Repository.ResolveRevision(nv.Revision)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve revision %q: %w", nv.Revision, err)
+	}
+
+	// There's no next version if the selected revision already has a version tag.
+	if _, exists := tags[*hash]; exists {
+		return nil, ErrRevIsAlreadyTagged
+	}
+
+	var iter object.CommitIter
+
+	iter, err = nv.Repository.Log(&git.LogOptions{
+		From:  *hash,
+		Order: git.LogOrderBSF,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not iterate over commits: %w", err)
+	}
+
+	var classification classifier.Classification
 
 	var version semver.Version
 
 	err = iter.ForEach(func(commit *object.Commit) error {
-		if ctx.Err() != nil {
-			if nv.Logger.Enabled(ctx, slog.LevelDebug) {
-				nv.Logger.LogAttrs(ctx, slog.LevelDebug, "cancelling finding tags",
-					slog.String("hash", commit.Hash.String()),
-					slog.String("cause", ctx.Err().Error()),
-				)
-			}
-
+		select {
+		case <-ctx.Done():
 			return ctx.Err()
+		default:
+			// Proceed
 		}
 
 		if version = tags[commit.Hash]; !version.IsZero() {
@@ -148,70 +159,58 @@ func (nv *NextVersion) Run(ctx context.Context) error {
 			return fmt.Errorf("could not parse commit message: %w", err)
 		}
 
-		if msg.Breaking {
-			major = true
-
-			return nil
-		}
-
-		switch msg.Type {
-		case "feat":
-			minor = true
-		case "fix", "sec":
-			patch = true
-		}
+		class := nv.CommitClassifier.Classify(&msg)
+		classification = max(classification, class)
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to calculate next version: %w", err)
+		return nil, fmt.Errorf("failed to calculate next version: %w", err)
 	}
 
-	// If the major version is zero then breaking changes are acceptable and should not increment major version.
-	if version.Major == 0 {
-		major = false
-	}
-
-	switch {
-	case major:
-		version.IncreaseMajor()
-	case minor:
-		version.IncreaseMinor()
-	case patch:
-		version.IncreasePatch()
-	}
+	updateVersion(&version, classification)
 
 	if nv.Prerelease != nil {
 		err = version.SetPrerelease(nv.Prerelease...)
 		if err != nil {
-			return fmt.Errorf("could not set prerelease version: %w", err)
+			return nil, fmt.Errorf("could not set prerelease version: %w", err)
 		}
 	}
 
 	if nv.Metadata != nil {
 		err = version.SetBuildMetadata(nv.Metadata...)
 		if err != nil {
-			return fmt.Errorf("could not set metadata version: %w", err)
+			return nil, fmt.Errorf("could not set metadata version: %w", err)
 		}
 	}
 
-	if nv.VSuffix {
-		_, err = nv.Writer.Write([]byte{'v'})
-		if err != nil {
-			return fmt.Errorf("could not write version suffix: %w", err)
-		}
-	}
-
-	_, err = nv.Writer.Write([]byte(version.String()))
-	if err != nil {
-		return fmt.Errorf("could not write next version: %w", err)
-	}
-
-	return nil
+	return &version, nil
 }
 
-func findTags(ctx context.Context, repo *git.Repository) (map[plumbing.Hash]semver.Version, error) {
+func updateVersion(version *semver.Version, classification classifier.Classification) {
+	switch classification {
+	case classifier.Major:
+		// If the major version is zero then breaking changes are acceptable and should not increment major version.
+		if version.Major == 0 {
+			version.IncreaseMinor()
+			break
+		}
+
+		version.IncreaseMajor()
+
+	case classifier.Minor:
+		version.IncreaseMinor()
+
+	case classifier.Patch:
+		version.IncreasePatch()
+
+	case classifier.None:
+		// Do nothing.
+	}
+}
+
+func tagsAsMap(ctx context.Context, repo *git.Repository) (map[plumbing.Hash]semver.Version, error) {
 	iter, err := repo.Tags()
 	if err != nil {
 		return nil, fmt.Errorf("could not get tags: %w", err)
