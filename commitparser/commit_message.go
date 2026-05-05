@@ -12,8 +12,13 @@ type CommitMessage struct {
 	Scope    string
 	Subject  string
 	Body     string
-	Trailers map[string][]string
+	Trailers []Trailer
 	Breaking bool
 	Revert   bool
 	Merge    bool
+}
+
+type Trailer struct {
+	Key   string
+	Value string
 }

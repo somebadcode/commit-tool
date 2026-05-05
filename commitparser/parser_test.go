@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"runtime/debug"
 	"testing"
+
+	gocmp "github.com/google/go-cmp/cmp"
 )
 
 type args struct {
@@ -190,8 +192,11 @@ var tests = []testCase{
 			Type:    "feat",
 			Subject: "oi",
 			Body:    "Something fun\n\nSecond paragraph",
-			Trailers: map[string][]string{
-				"Ticket": {"ABC-4321"},
+			Trailers: []Trailer{
+				{
+					Key:   "Ticket",
+					Value: "ABC-4321",
+				},
 			},
 		},
 	},
@@ -204,9 +209,14 @@ var tests = []testCase{
 			Type:    "feat",
 			Subject: "oi",
 			Body:    "Something fun\n\nSecond paragraph",
-			Trailers: map[string][]string{
-				"Ticket": {"ABC-4321"},
-				"Fix":    {"#12"},
+			Trailers: []Trailer{
+				{
+					Key:   "Ticket",
+					Value: "ABC-4321",
+				}, {
+					Key:   "Fix",
+					Value: "#12",
+				},
 			},
 		},
 	},
@@ -251,7 +261,7 @@ var tests = []testCase{
 		want: CommitMessage{
 			Type:    "feat",
 			Subject: "oi",
-			Body:    "Something fun\n\nSecond paragraph\n\nReference-to: ",
+			Body:    "Something fun\n\nSecond paragraph\n\nReference-to:",
 		},
 	},
 	{
@@ -263,8 +273,14 @@ var tests = []testCase{
 			Type:    "fix",
 			Subject: "foo parse bad",
 			Body:    "Fixed this and that",
-			Trailers: map[string][]string{
-				"Ticket": {"ABC-100", "DEF-321"},
+			Trailers: []Trailer{
+				{
+					Key:   "Ticket",
+					Value: "ABC-100",
+				}, {
+					Key:   "Ticket",
+					Value: "DEF-321",
+				},
 			},
 		},
 	},
@@ -277,9 +293,15 @@ var tests = []testCase{
 			Type:    "fix",
 			Subject: "foo parse bad",
 			Body:    "Fixed this and that",
-			Trailers: map[string][]string{
-				"Ticket":   {"ABC-100"},
-				"Security": {"Addresses 1234 by this and that method\nand according to the discussion in incident SEC-34, blah boo blaha"},
+			Trailers: []Trailer{
+				{
+					Key:   "Ticket",
+					Value: "ABC-100",
+				},
+				{
+					Key:   "Security",
+					Value: "Addresses 1234 by this and that method\n and according to the discussion in incident SEC-34, blah boo blaha",
+				},
 			},
 		},
 	},
@@ -293,9 +315,14 @@ var tests = []testCase{
 			Subject:  "trailer parsing",
 			Body:     "Fixed this and that",
 			Breaking: true,
-			Trailers: map[string][]string{
-				"Ticket":          {"ABC-100"},
-				"BREAKING CHANGE": {"Yup!"},
+			Trailers: []Trailer{
+				{
+					Key:   "Ticket",
+					Value: "ABC-100",
+				}, {
+					Key:   "BREAKING CHANGE",
+					Value: "Yup!",
+				},
 			},
 		},
 	},
@@ -304,11 +331,7 @@ var tests = []testCase{
 		args: args{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nBREAKING STUFF: Yup!",
 		},
-		want: CommitMessage{
-			Type:    "fix",
-			Subject: "trailer parsing",
-			Body:    "Fixed this and that\n\nBREAKING STUFF: Yup!",
-		},
+		wantErr: true,
 	},
 	{
 		name: "trailer_not_upper",
@@ -318,7 +341,13 @@ var tests = []testCase{
 		want: CommitMessage{
 			Type:    "fix",
 			Subject: "trailer parsing",
-			Body:    "Fixed this and that\n\nthis-is-not-upper: nope!",
+			Body:    "Fixed this and that",
+			Trailers: []Trailer{
+				{
+					Key:   "this-is-not-upper",
+					Value: "nope!",
+				},
+			},
 		},
 	},
 	{
@@ -326,11 +355,7 @@ var tests = []testCase{
 		args: args{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nSomething strange: Yup!",
 		},
-		want: CommitMessage{
-			Type:    "fix",
-			Subject: "trailer parsing",
-			Body:    "Fixed this and that\n\nSomething strange: Yup!",
-		},
+		wantErr: true,
 	},
 }
 
@@ -350,7 +375,8 @@ func TestParse(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parse() got = %#v, want %#v", got, tt.want)
+				diff := gocmp.Diff(got, tt.want)
+				t.Errorf("parse() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -386,4 +412,45 @@ func FuzzParse(f *testing.F) {
 		}()
 		_, _ = Parse(message)
 	})
+}
+
+func Test_isTrailerBlock(t *testing.T) {
+	type args struct {
+		block string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			args: args{
+				block: "Key: value",
+			},
+			want: 1,
+		},
+		{
+			args: args{
+				block: "Key value",
+			},
+			want: -1,
+		},
+		{
+			args: args{
+				block: "Key #123",
+			},
+			want: 1,
+		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := countTailers(tt.args.block); got != tt.want {
+				t.Errorf("isTrailerBlock() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

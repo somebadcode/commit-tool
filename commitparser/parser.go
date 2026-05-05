@@ -39,7 +39,7 @@ var (
 const (
 	TrailerKeyBreakingChangePrefix = "BREAKING"
 	TrailerKeyBreakingChange       = TrailerKeyBreakingChangePrefix + " CHANGE"
-	TrailerKeyBreakingChangeAlt    = TrailerKeyBreakingChangePrefix + "-" + TrailerKeyBreakingChange
+	TrailerKeyBreakingChangeAlt    = TrailerKeyBreakingChangePrefix + "-CHANGE"
 )
 
 func Parse(message string) (CommitMessage, error) {
@@ -52,8 +52,8 @@ func (p *parser) parse() (CommitMessage, error) {
 	}
 
 	// Breaking change might be flagged using a trailer key.
-	for k := range p.commit.Trailers {
-		if k == TrailerKeyBreakingChange || k == TrailerKeyBreakingChangeAlt {
+	for _, tr := range p.commit.Trailers {
+		if tr.Key == TrailerKeyBreakingChange || tr.Key == TrailerKeyBreakingChangeAlt {
 			p.commit.Breaking = true
 			break
 		}
@@ -167,45 +167,27 @@ func parseBody(p *parser) stateFunc {
 
 	i := strings.LastIndex(p.remains(), "\n\n")
 	if i == -1 {
-		// No more paragraphs found. Using the remains for the message body and stopping.
+		if n := countTailers(strings.TrimSpace(p.remains())); n != -1 {
+			p.commit.Trailers = make([]Trailer, 0, n)
+
+			return parseTrailer
+		}
+
 		p.commit.Body = strings.TrimSpace(p.remains())
 
 		return nil
 	}
 
-	// Paragraphs were found, so move position up to the end of the penultimate paragraph and save the body.
-	p.pos += i
-	p.commit.Body = strings.TrimSpace(p.token())
+	if n := countTailers(p.remains()[i+2:]); n != -1 {
+		p.commit.Body = strings.TrimSpace(p.remains()[:i])
+		p.skipN(i + 2)
 
-	// Move position up two positions ("\n\n") and skip.
-	p.pos += 2
-	p.skip()
+		p.commit.Trailers = make([]Trailer, 0, n)
 
-	// Parse trailers.
-	return parseTrailers
-}
-
-func parseTrailers(p *parser) stateFunc {
-	// Save the remains in case the last paragraph can't be parsed as git trailers.
-	remains := p.remains()
-
-	p.commit.Trailers = make(map[string][]string)
-
-	// Parse the trailers but if the error is ErrInvalidTrailer then we should append the remains to the body.
-	// Any other error should bubble up.
-	for state := parseTrailer(p); state != nil; state = state(p) {
+		return parseTrailer
 	}
 
-	if errors.Is(p.err, ErrInvalidTrailer) {
-		p.err = nil
-		p.commit.Body += "\n\n" + remains
-		p.commit.Trailers = nil
-	}
-
-	// If there are no trailers, make sure the map is nil.
-	if p.commit.Trailers != nil && len(p.commit.Trailers) == 0 {
-		p.commit.Trailers = nil
-	}
+	p.commit.Body = strings.TrimSpace(p.remains())
 
 	return nil
 }
@@ -227,11 +209,6 @@ func parseTrailer(p *parser) stateFunc {
 	}
 
 	key := p.token()
-
-	// Trailer key must start with upper case.
-	if first, _ := utf8.DecodeRuneInString(key); !unicode.IsUpper(first) {
-		return failParsing(p, fmt.Errorf("git trailer key must start with upper case: %w", ErrInvalidTrailer))
-	}
 
 	switch p.next() {
 	case ' ':
@@ -261,28 +238,14 @@ func parseTrailer(p *parser) stateFunc {
 		}
 	}
 
-	// If the trailer key is empty then it's not a valid trailer so skip the paragraph and fall back.
-	if len(p.text()) == 0 {
-		return failParsing(p, fmt.Errorf("git trailer key is empty: %w", ErrInvalidTrailer))
-	}
-
-	lines := strings.FieldsFunc(p.token(), func(r rune) bool {
-		return r == '\n'
-	})
-
-	sb := strings.Builder{}
-	defer sb.Reset()
-
-	for _, line := range lines {
-		sb.WriteString(strings.TrimSpace(line))
-		sb.WriteRune('\n')
-	}
-
 	if key == TrailerKeyBreakingChange || key == TrailerKeyBreakingChangeAlt {
 		p.commit.Breaking = true
 	}
 
-	p.commit.Trailers[key] = append(p.commit.Trailers[key], strings.TrimSpace(sb.String()))
+	p.commit.Trailers = append(p.commit.Trailers, Trailer{
+		Key:   key,
+		Value: strings.TrimSpace(p.text()),
+	})
 	if r == utf8.RuneError {
 		return nil
 	}
@@ -356,4 +319,75 @@ func (p *parser) text() string {
 
 func (p *parser) skip() {
 	p.start = p.pos
+}
+
+func (p *parser) skipN(n int) {
+	p.pos += n
+	p.skip()
+}
+
+func countTailers(block string) int {
+	if block == "" {
+		return -1
+	}
+
+	remaining := block
+	isFirstLine := true
+
+	var count int
+
+	for len(remaining) > 0 {
+		var line string
+
+		i := strings.IndexByte(remaining, '\n')
+		if i == -1 {
+			line = remaining
+			remaining = ""
+		} else {
+			line = remaining[:i]
+			remaining = remaining[i+1:]
+		}
+
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		if (line[0] == ' ' || line[0] == '\t') && !isFirstLine {
+			continue
+		}
+
+		isFirstLine = false
+
+		sepIndex := strings.IndexByte(line, ':')
+		if sepIndex != -1 {
+			if sepIndex < len(line)-2 && line[sepIndex+1] == ' ' {
+				value := strings.TrimSpace(line[sepIndex+2:])
+				if value != "" {
+					count++
+					continue
+				}
+
+				return -1
+			}
+
+			if strings.HasPrefix(line, TrailerKeyBreakingChange) || strings.HasPrefix(line, TrailerKeyBreakingChangeAlt) {
+				count++
+				continue
+			}
+
+			return -1
+		}
+
+		sepIndex = strings.IndexByte(line, '#')
+		if sepIndex > 0 {
+			if line[sepIndex-1] == ' ' {
+				count++
+				continue
+			}
+		}
+
+		return -1
+	}
+
+	return count
 }
