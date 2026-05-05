@@ -188,6 +188,169 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 				Major: 1,
 			},
 		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("1.3.0", nil),
+					repobuilder.Tag("1.3.4", nil),
+					repobuilder.Commit("fix: use equal fold", commitOpts),
+					repobuilder.Commit("refactor!: make api spec compliant", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 2,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("1.3.0", nil),
+					repobuilder.Tag("1.3.4", nil),
+					repobuilder.Commit("fix: use equal fold", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 1,
+				Minor: 3,
+				Patch: 5,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("not-semver", nil),
+					repobuilder.Tag("1.3.0", nil),
+					repobuilder.Commit("fix: use equal fold", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 1,
+				Minor: 3,
+				Patch: 1,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("not-semver", &git.CreateTagOptions{
+						Tagger:  commitOpts.Author,
+						Message: "This doesn't matter!",
+					}),
+					repobuilder.Tag("1.3.4", nil),
+					repobuilder.Commit("fix: use equal fold", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 1,
+				Minor: 3,
+				Patch: 5,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("1.0.1-beta.1", nil),
+					repobuilder.Commit("refactor!: use equal fold", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 2,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("1.0.1-beta.1", nil),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+				Prerelease: []string{"beta", "2"},
+			},
+			want: &semver.Version{
+				Major: 1,
+				Minor: 0,
+				Patch: 1,
+				Prerelease: []semver.Segment{
+					semver.NewSegment("beta"),
+					semver.NewNumericSegment(2),
+				},
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Tag("1.0.1", nil),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+			},
+			want: &semver.Version{
+				Major: 1,
+				Minor: 0,
+				Patch: 1,
+			},
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+				Prerelease: []string{"."},
+			},
+			wantErr: true,
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+				Metadata: []string{"."},
+			},
+			wantErr: true,
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+				Metadata: []string{"+"},
+			},
+			wantErr: true,
+		},
+		{
+			fields: fields{
+				Repository: buildRepo(t,
+					repobuilder.Commit("feat: initial commit", commitOpts),
+					repobuilder.Commit("fix: prevent panic", commitOpts),
+					repobuilder.Commit("chore: bad comment grammar", commitOpts),
+				),
+				Metadata: []string{"-"},
+			},
+			want: &semver.Version{
+				Minor: 1,
+				BuildMetadata: []semver.Segment{
+					semver.NewSegment("-"),
+				},
+			},
+		},
 	}
 
 	t.Parallel()
