@@ -22,12 +22,15 @@ import (
 	"codeberg.org/somebadcode/commit-tool/semver"
 )
 
-func must[T any](v T, err error) T {
+func buildRepo(tb testing.TB, operations ...repobuilder.OperationFunc) *git.Repository {
+	tb.Helper()
+
+	repo, err := repobuilder.Build(operations...)
 	if err != nil {
-		panic(err)
+		tb.Fatalf("could not build repository: %v", err)
 	}
 
-	return v
+	return repo
 }
 
 func TestNextVersion_ComputeNextVersion(t *testing.T) {
@@ -58,10 +61,10 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 	}{
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Minor: 1,
@@ -69,7 +72,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("14.1.4", &git.CreateTagOptions{
@@ -77,7 +80,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 						Message: "Release 14.1.4",
 					}),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Major: 14,
@@ -87,12 +90,12 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Minor: 1,
@@ -101,12 +104,12 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
-				)),
+				),
 				Prerelease: []string{"rc", "0"},
 			},
 			want: &semver.Version{
@@ -120,12 +123,12 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
-				)),
+				),
 				Prerelease: []string{"rc", "0"},
 				Metadata:   []string{"dev"},
 			},
@@ -143,13 +146,13 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
 					repobuilder.Commit("refactor!: make api spec compliant", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Minor: 2,
@@ -158,13 +161,13 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1-rc.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
 					repobuilder.Commit("refactor!: make api spec compliant", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Minor: 1,
@@ -173,13 +176,13 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: must(repobuilder.Build(
+				Repository: buildRepo(t,
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.0.0-rc.1", nil),
 					repobuilder.Commit("fix: use equal fold", commitOpts),
 					repobuilder.Commit("refactor!: make api spec compliant", commitOpts),
-				)),
+				),
 			},
 			want: &semver.Version{
 				Major: 1,
