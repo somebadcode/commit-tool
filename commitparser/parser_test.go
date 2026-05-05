@@ -375,7 +375,7 @@ func TestParse(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {
-				diff := gocmp.Diff(got, tt.want)
+				diff := gocmp.Diff(tt.want, got)
 				t.Errorf("parse() mismatch (-want +got):\n%s", diff)
 			}
 		})
