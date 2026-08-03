@@ -15,21 +15,21 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 )
 
-type args struct {
+type argsParse struct {
 	message string
 }
 
-type testCase struct {
+type testParseCase struct {
 	name    string
-	args    args
+	args    argsParse
 	want    CommitMessage
 	wantErr bool
 }
 
-var tests = []testCase{
+var testParseCases = []testParseCase{
 	{
 		name: "type scope subject and body",
-		args: args{
+		args: argsParse{
 			message: "feat(woop): something\n\nAdded more features\n",
 		},
 		want: CommitMessage{
@@ -42,7 +42,7 @@ var tests = []testCase{
 	},
 	{
 		name: "type subject and body",
-		args: args{
+		args: argsParse{
 			message: "feat: something\n\nAdded more features\n",
 		},
 		want: CommitMessage{
@@ -54,7 +54,7 @@ var tests = []testCase{
 	},
 	{
 		name: "type and subject",
-		args: args{
+		args: argsParse{
 			message: "change: stuff",
 		},
 		want: CommitMessage{
@@ -65,21 +65,21 @@ var tests = []testCase{
 	},
 	{
 		name: "type but no subject",
-		args: args{
+		args: argsParse{
 			message: "change:",
 		},
 		wantErr: true,
 	},
 	{
 		name: "only type",
-		args: args{
+		args: argsParse{
 			message: "change",
 		},
 		wantErr: true,
 	},
 	{
 		name: "breaking feature",
-		args: args{
+		args: argsParse{
 			message: "feat!: refactored to support Y\n\nDid stuff!",
 		},
 		want: CommitMessage{
@@ -91,7 +91,7 @@ var tests = []testCase{
 	},
 	{
 		name: "breaking feature with scope",
-		args: args{
+		args: argsParse{
 			message: "feat(cli)!: refactored to support Y\n\nDid stuff!",
 		},
 		want: CommitMessage{
@@ -104,7 +104,7 @@ var tests = []testCase{
 	},
 	{
 		name: "misplaced exclamation mark",
-		args: args{
+		args: argsParse{
 			message: "feat!(cli): refactored to support Y\n\nDid stuff!",
 		},
 		want: CommitMessage{
@@ -115,14 +115,14 @@ var tests = []testCase{
 	},
 	{
 		name: "empty",
-		args: args{
+		args: argsParse{
 			message: "",
 		},
 		wantErr: true,
 	},
 	{
 		name: "missing space",
-		args: args{
+		args: argsParse{
 			message: "feat:new stuff",
 		},
 		want:    CommitMessage{Type: "feat"},
@@ -130,7 +130,7 @@ var tests = []testCase{
 	},
 	{
 		name: "missing colon",
-		args: args{
+		args: argsParse{
 			message: "feat! new stuff",
 		},
 		want: CommitMessage{
@@ -141,7 +141,7 @@ var tests = []testCase{
 	},
 	{
 		name: "revert",
-		args: args{
+		args: argsParse{
 			message: "revert: new stuff",
 		},
 		want: CommitMessage{
@@ -152,7 +152,7 @@ var tests = []testCase{
 	},
 	{
 		name: "merge",
-		args: args{
+		args: argsParse{
 			message: "merge: branch 'foo' into 'bar'",
 		},
 		want: CommitMessage{
@@ -163,7 +163,7 @@ var tests = []testCase{
 	},
 	{
 		name: "single_paragraph",
-		args: args{
+		args: argsParse{
 			message: "feat: hej\n\nSomething fun",
 		},
 		want: CommitMessage{
@@ -174,7 +174,7 @@ var tests = []testCase{
 	},
 	{
 		name: "two_paragraphs",
-		args: args{
+		args: argsParse{
 			message: "feat: hallo\n\nSomething fun\n\nSecond paragraph",
 		},
 		want: CommitMessage{
@@ -185,7 +185,7 @@ var tests = []testCase{
 	},
 	{
 		name: "trailer",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321",
 		},
 		want: CommitMessage{
@@ -202,7 +202,7 @@ var tests = []testCase{
 	},
 	{
 		name: "trailers",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321\nFix #12",
 		},
 		want: CommitMessage{
@@ -222,7 +222,7 @@ var tests = []testCase{
 	},
 	{
 		name: "not_a_trailer",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nTicket: ABC-4321\nMalformed commit",
 		},
 		want: CommitMessage{
@@ -233,7 +233,7 @@ var tests = []testCase{
 	},
 	{
 		name: "not_a_trailer_alt",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nFix #900\nMalformed commit",
 		},
 		want: CommitMessage{
@@ -244,7 +244,7 @@ var tests = []testCase{
 	},
 	{
 		name: "bad_trailer_key",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nReference to: abcdef1234\nMalformed commit",
 		},
 		want: CommitMessage{
@@ -255,7 +255,7 @@ var tests = []testCase{
 	},
 	{
 		name: "more_bad_trailers3",
-		args: args{
+		args: argsParse{
 			message: "feat: oi\n\nSomething fun\n\nSecond paragraph\n\nReference-to: ",
 		},
 		want: CommitMessage{
@@ -266,7 +266,7 @@ var tests = []testCase{
 	},
 	{
 		name: "multi_value_git_trailer",
-		args: args{
+		args: argsParse{
 			message: "fix: foo parse bad\n\nFixed this and that\n\nTicket: ABC-100\nTicket: DEF-321",
 		},
 		want: CommitMessage{
@@ -286,7 +286,7 @@ var tests = []testCase{
 	},
 	{
 		name: "multi_line_git_trailer",
-		args: args{
+		args: argsParse{
 			message: "fix: foo parse bad\n\nFixed this and that\n\nTicket: ABC-100\nSecurity: Addresses 1234 by this and that method\n and according to the discussion in incident SEC-34, blah boo blaha\n ",
 		},
 		want: CommitMessage{
@@ -307,7 +307,7 @@ var tests = []testCase{
 	},
 	{
 		name: "breaking_change",
-		args: args{
+		args: argsParse{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nTicket: ABC-100\nBREAKING CHANGE: Yup!",
 		},
 		want: CommitMessage{
@@ -328,14 +328,18 @@ var tests = []testCase{
 	},
 	{
 		name: "breaking_stuff_bad",
-		args: args{
+		args: argsParse{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nBREAKING STUFF: Yup!",
 		},
-		wantErr: true,
+		want: CommitMessage{
+			Type:    "fix",
+			Subject: "trailer parsing",
+			Body:    "Fixed this and that\n\nBREAKING STUFF: Yup!",
+		},
 	},
 	{
 		name: "trailer_not_upper",
-		args: args{
+		args: argsParse{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nthis-is-not-upper: nope!",
 		},
 		want: CommitMessage{
@@ -351,22 +355,80 @@ var tests = []testCase{
 		},
 	},
 	{
+		name: "trailer_not_upper",
+		args: argsParse{
+			message: "fix: trailer parsing\n\nFixed this and that\n\nthis-is-not-upper: nope!\n",
+		},
+		want: CommitMessage{
+			Type:    "fix",
+			Subject: "trailer parsing",
+			Body:    "Fixed this and that",
+			Trailers: []Trailer{
+				{
+					Key:   "this-is-not-upper",
+					Value: "nope!",
+				},
+			},
+		},
+	},
+	{
 		name: "trailer_bad_key",
-		args: args{
+		args: argsParse{
 			message: "fix: trailer parsing\n\nFixed this and that\n\nSomething strange: Yup!",
+		},
+		want: CommitMessage{
+			Type:    "fix",
+			Subject: "trailer parsing",
+			Body:    "Fixed this and that\n\nSomething strange: Yup!",
+		},
+	},
+	{
+		name: "bad_trailer_key_colon",
+		args: argsParse{
+			message: "feat: add foo\n\nkey:  ",
+		},
+		want: CommitMessage{
+			Type:    "feat",
+			Subject: "add foo",
+			Body:    "key:",
+		},
+	},
+	{
+		name: "extra_linefeed",
+		args: argsParse{
+			message: "fix: trailer parsing\n\nFixed this and that\n\n\n",
+		},
+		want: CommitMessage{
+			Type:    "fix",
+			Subject: "trailer parsing",
+			Body:    "Fixed this and that",
+		},
+	},
+	{
+		name: "trailer_key_carriage_return",
+		args: argsParse{
+			message: "fix: trailer parsing\n\nFixed this and that\n\nBREAKING\rCHANGE: Yup!",
+		},
+		wantErr: true,
+	},
+	{
+		name: "trailer_value_carriage_return",
+		args: argsParse{
+			message: "fix: trailer parsing\n\nFixed this and that\n\nBREAKING CHANGE: Yup!\r and more",
 		},
 		wantErr: true,
 	},
 }
 
 func TestParse(t *testing.T) {
-	for _, tt := range tests {
+	for _, tt := range testParseCases {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			got, err := Parse(tt.args.message)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parse() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("parse() error = %v", err)
 				return
 			}
 
@@ -383,7 +445,7 @@ func TestParse(t *testing.T) {
 }
 
 func BenchmarkParse(b *testing.B) {
-	for _, tt := range tests {
+	for _, tt := range testParseCases {
 		b.Run(tt.name, func(b *testing.B) {
 			for b.Loop() {
 				_, _ = Parse(tt.args.message)
@@ -399,7 +461,7 @@ func FuzzParse(f *testing.F) {
 	f.Add("change: stuff")
 	f.Add("feat!: refactored to support Y\n\nDid stuff!")
 
-	for _, tt := range tests {
+	for _, tt := range testParseCases {
 		f.Add(tt.args.message)
 	}
 
@@ -410,47 +472,25 @@ func FuzzParse(f *testing.F) {
 				t.Errorf("Parser(%q) caused a panic (%#v): %v\n%s", message, msg, err, debug.Stack())
 			}
 		}()
-		_, _ = Parse(message)
-	})
-}
+		var err error
 
-func Test_isTrailerBlock(t *testing.T) {
-	type args struct {
-		block string
-	}
+		msg, err = Parse(message)
+		if err != nil {
+			return
+		}
 
-	tests := []struct {
-		name string
-		args args
-		want int
-	}{
-		{
-			args: args{
-				block: "Key: value",
-			},
-			want: 1,
-		},
-		{
-			args: args{
-				block: "Key value",
-			},
-			want: -1,
-		},
-		{
-			args: args{
-				block: "Key #123",
-			},
-			want: 1,
-		},
-	}
+		if msg.Type == "" {
+			t.Errorf("Parser() did not return a type. Input: %q", message)
+		}
 
-	t.Parallel()
+		if msg.Subject == "" {
+			t.Errorf("Parser() did not return a subject. Input: %q", message)
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := countTailers(tt.args.block); got != tt.want {
-				t.Errorf("isTrailerBlock() = %v, want %v", got, tt.want)
+		for _, tr := range msg.Trailers {
+			if tr.Key == "" || tr.Value == "" {
+				t.Errorf("Parse() yielded a trailer with an empty key(%q) or value(%q). Input: %q", tr.Key, tr.Value, message)
 			}
-		})
-	}
+		}
+	})
 }

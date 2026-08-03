@@ -34,7 +34,7 @@ var conventionalTypes = map[string]struct{}{
 }
 
 type Settings struct {
-	MaxHeaderLength int
+	MaxHeaderLength uint
 }
 
 type Validator struct {
@@ -117,7 +117,7 @@ func (v *Validator) Validate(msg commitparser.CommitMessage, commit *object.Comm
 	sizeSubject := utf8.RuneCountInString(msg.Subject)
 
 	size := sizeType + sizeScope + sizeSubject
-	if size > v.settings.MaxHeaderLength {
+	if size > int(v.settings.MaxHeaderLength) {
 		return fmt.Errorf("commit header too long (%d>%d): %w", size, v.settings.MaxHeaderLength, ErrInvalidScope)
 	}
 

@@ -70,11 +70,15 @@ func (p *parser) parse() (CommitMessage, error) {
 		p.commit.Merge = true
 	}
 
+	if p.err == io.EOF {
+		p.err = nil
+	}
+
 	return p.commit, p.err
 }
 
 func failParsing(p *parser, err error) stateFunc {
-	p.err = ParseError{
+	p.err = &ParseError{
 		err: err,
 		Pos: p.pos,
 	}
@@ -89,7 +93,10 @@ func parseType(p *parser) stateFunc {
 	}
 
 	p.commit.Type = p.token()
-	p.skip()
+
+	if p.commit.Type == "" {
+		return failParsing(p, ErrInvalidType)
+	}
 
 	switch p.Peek() {
 	case '!':
@@ -105,6 +112,7 @@ func parseScope(p *parser) stateFunc {
 	if r := p.next(); r != '(' {
 		return failParsing(p, ErrInvalidSubject)
 	}
+
 	p.skip()
 
 	r := p.acceptUntil(")")
@@ -139,10 +147,11 @@ func parseBreaking(p *parser) stateFunc {
 
 func parseSubject(p *parser) stateFunc {
 	if r := p.next(); r != ':' {
-		return failParsing(p, ErrInvalidSubject)
+		return failParsing(p, fmt.Errorf("expected ':', got %c: %w", r, ErrInvalidTrailer))
 	}
+
 	if r := p.next(); r != ' ' {
-		return failParsing(p, ErrInvalidSubject)
+		return failParsing(p, fmt.Errorf("expected ' ', got %c: %w", r, ErrInvalidTrailer))
 	}
 
 	p.skip()
@@ -153,6 +162,10 @@ func parseSubject(p *parser) stateFunc {
 	}
 
 	p.commit.Subject = p.token()
+
+	if p.commit.Subject == "" {
+		return failParsing(p, ErrInvalidSubject)
+	}
 
 	return parseBody
 }
@@ -193,32 +206,34 @@ func parseBody(p *parser) stateFunc {
 }
 
 func parseTrailer(p *parser) stateFunc {
-	r := p.acceptUntil(": ")
+	var r rune
 
-	// If there's a space and the text matches the breaking change prefix, continue until `:` and make sure that it's
-	// a breaking change.
-	if r == ' ' && p.text() == TrailerKeyBreakingChangePrefix {
+	if strings.HasPrefix(p.remains(), TrailerKeyBreakingChange) || strings.HasPrefix(p.text(), TrailerKeyBreakingChangeAlt) {
 		r = p.acceptUntil(":")
-		if p.text() != TrailerKeyBreakingChange {
-			return failParsing(p, fmt.Errorf("git trailer key can not contain space, expected key %q: %w", TrailerKeyBreakingChange, ErrInvalidTrailer))
-		}
+	} else {
+		r = p.acceptUntil(": ")
 	}
 
 	if r == utf8.RuneError {
 		return nil
 	}
 
-	key := p.token()
+	key := strings.TrimSpace(p.token())
+	if key == "" {
+		return failParsing(p, fmt.Errorf("trailer key is empty: %w", ErrInvalidTrailer))
+	}
 
-	switch p.next() {
+	p.next()
+
+	switch r {
 	case ' ':
-		if p.Peek() != '#' {
-			return failParsing(p, fmt.Errorf("expected a pound/hash sign: %w", ErrInvalidTrailer))
+		if r = p.Peek(); r != '#' {
+			return failParsing(p, fmt.Errorf("expected a pound/hash sign, got '%c': %w", r, ErrInvalidTrailer))
 		}
 
 	case ':':
-		if p.Peek() != ' ' {
-			return failParsing(p, fmt.Errorf("expected a space: %w", ErrInvalidTrailer))
+		if r = p.Peek(); r != ' ' {
+			return failParsing(p, fmt.Errorf("expected space, got '%c': %w", r, ErrInvalidTrailer))
 		}
 
 		p.next()
@@ -238,14 +253,28 @@ func parseTrailer(p *parser) stateFunc {
 		}
 	}
 
+	value := strings.TrimSpace(p.text())
+	if value == "" {
+		return failParsing(p, fmt.Errorf("empty value: %w", ErrInvalidTrailer))
+	}
+
 	if key == TrailerKeyBreakingChange || key == TrailerKeyBreakingChangeAlt {
 		p.commit.Breaking = true
 	}
 
+	if strings.ContainsAny(key, "\r") {
+		return failParsing(p, fmt.Errorf("trailer key is invalid (found carriage return: %w", ErrInvalidTrailer))
+	}
+
+	if strings.Contains(value, "\r") {
+		return failParsing(p, fmt.Errorf("trailer value is invalid (found carriage return: %w", ErrInvalidTrailer))
+	}
+
 	p.commit.Trailers = append(p.commit.Trailers, Trailer{
 		Key:   key,
-		Value: strings.TrimSpace(p.text()),
+		Value: value,
 	})
+
 	if r == utf8.RuneError {
 		return nil
 	}
@@ -266,10 +295,10 @@ func (p *parser) next() rune {
 
 	var r rune
 	r, p.size = utf8.DecodeRuneInString(p.msg[p.pos:])
-	if p.char == utf8.RuneError && p.size == 0 {
+	if r == utf8.RuneError && p.size == 0 {
 		p.err = io.EOF
 		return utf8.RuneError
-	} else if p.char == utf8.RuneError {
+	} else if r == utf8.RuneError {
 		p.err = ErrInvalidMessage
 		return utf8.RuneError
 	}
@@ -324,70 +353,4 @@ func (p *parser) skip() {
 func (p *parser) skipN(n int) {
 	p.pos += n
 	p.skip()
-}
-
-func countTailers(block string) int {
-	if block == "" {
-		return -1
-	}
-
-	remaining := block
-	isFirstLine := true
-
-	var count int
-
-	for len(remaining) > 0 {
-		var line string
-
-		i := strings.IndexByte(remaining, '\n')
-		if i == -1 {
-			line = remaining
-			remaining = ""
-		} else {
-			line = remaining[:i]
-			remaining = remaining[i+1:]
-		}
-
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		if (line[0] == ' ' || line[0] == '\t') && !isFirstLine {
-			continue
-		}
-
-		isFirstLine = false
-
-		sepIndex := strings.IndexByte(line, ':')
-		if sepIndex != -1 {
-			if sepIndex < len(line)-2 && line[sepIndex+1] == ' ' {
-				value := strings.TrimSpace(line[sepIndex+2:])
-				if value != "" {
-					count++
-					continue
-				}
-
-				return -1
-			}
-
-			if strings.HasPrefix(line, TrailerKeyBreakingChange) || strings.HasPrefix(line, TrailerKeyBreakingChangeAlt) {
-				count++
-				continue
-			}
-
-			return -1
-		}
-
-		sepIndex = strings.IndexByte(line, '#')
-		if sepIndex > 0 {
-			if line[sepIndex-1] == ' ' {
-				count++
-				continue
-			}
-		}
-
-		return -1
-	}
-
-	return count
 }

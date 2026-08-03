@@ -18,6 +18,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+
+	"codeberg.org/somebadcode/commit-tool/internal/reconcile"
 )
 
 type ReportFunc func(ctx context.Context, err error)
@@ -64,7 +66,7 @@ func (l *Linter) Validate() error {
 	}
 
 	if l.OtherRev != "" && l.StopFunc == nil {
-		stopFunc, err := stopAtActualOther(l.Repo, l.Rev, l.OtherRev)
+		stopFunc, err := stopAtMergeBases(l.Repo, l.Rev, l.OtherRev)
 		if err != nil {
 			return err
 		}
@@ -168,17 +170,17 @@ func (l *Linter) Run(ctx context.Context) error {
 	return nil
 }
 
-func stopAtActualOther(repo *git.Repository, rev plumbing.Revision, otherRev plumbing.Revision) (StopFunc, error) {
+func stopAtMergeBasesLocal(repo *git.Repository, rev plumbing.Revision, otherRev plumbing.Revision) (StopFunc, error) {
 	// Get start commit.
 	hash, err := repo.ResolveRevision(rev)
 	if err != nil {
-		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+		return nil, fmt.Errorf("bad revision %q: %w", rev, err)
 	}
 
 	var commit *object.Commit
 	commit, err = repo.CommitObject(*hash)
 	if err != nil {
-		return nil, fmt.Errorf("bad revision %q: %w", otherRev, err)
+		return nil, fmt.Errorf("bad revision %q: %w", rev, err)
 	}
 
 	// Get other commit.
@@ -197,6 +199,25 @@ func stopAtActualOther(repo *git.Repository, rev plumbing.Revision, otherRev plu
 	mergeBases, err = commit.MergeBase(other)
 	if err != nil {
 		return nil, fmt.Errorf("revisions %q and %q do not have a common ancestor: %w", rev, otherRev, err)
+	}
+
+	return StopAtMergeBases(mergeBases), nil
+}
+
+func stopAtMergeBases(repo *git.Repository, rev plumbing.Revision, otherRev plumbing.Revision) (StopFunc, error) {
+	stopFunc, err := stopAtMergeBasesLocal(repo, rev, otherRev)
+	if err == nil {
+		return stopFunc, nil
+	}
+
+	var mergeBases []*object.Commit
+	mergeBases, err = reconcile.Reconcile(context.TODO(), repo, reconcile.Config{
+		RemoteName:      git.DefaultRemoteName,
+		SourceRevision:  rev,
+		TargetRevisions: []plumbing.Revision{otherRev},
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return StopAtMergeBases(mergeBases), nil
