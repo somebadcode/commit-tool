@@ -25,7 +25,3 @@ This software uses the following external modules:
 * **go-cmp** (https://github.com/google/go-cmp/)
   Licensed under BSD 3-Clause "New" or "Revised" License
   Copyright (c) The Go Authors and contributors
-
-* **semver** (https://github.com/Masterminds/semver)
-  Licensed under the MIT License
-  Copyright (c) Masterminds and contributors
