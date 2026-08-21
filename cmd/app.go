@@ -52,8 +52,8 @@ func Run() StatusCode {
 	var cli CLI
 
 	command := kong.Parse(&cli,
-		kong.TypeMapper(reflect.TypeOf((*git.Repository)(nil)), kongmappings.Repository()),
-		kong.TypeMapper(reflect.TypeOf((*cpuprofiler.Profiler)(nil)), cpuprofiler.KongMapperFunc()),
+		kong.TypeMapper(reflect.TypeFor[*git.Repository](), kongmappings.Repository()),
+		kong.TypeMapper(reflect.TypeFor[*cpuprofiler.Profiler](), cpuprofiler.KongMapperFunc()),
 		kong.Description("Commit Tool - a helpful tool for when you're working with git repositories"),
 		kong.ExplicitGroups([]kong.Group{
 			{

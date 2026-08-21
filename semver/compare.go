@@ -48,7 +48,7 @@ func Compare(v1, v2 Version) int {
 
 	n := min(len(v1.Prerelease), len(v2.Prerelease))
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		a, b := v1.Prerelease[i], v2.Prerelease[i]
 
 		// If both are numeric, do a simple comparison.
