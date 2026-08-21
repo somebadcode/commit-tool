@@ -35,7 +35,7 @@ func (cmd *NextVersionCommand) Run(ctx context.Context, l *slog.Logger) error {
 		f = os.Stdout
 	} else {
 		var err error
-		f, err = os.OpenFile(cmd.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
+		f, err = os.OpenFile(cmd.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			return fmt.Errorf("opening output file: %w", err)
 		}

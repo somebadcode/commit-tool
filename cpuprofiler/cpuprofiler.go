@@ -36,7 +36,7 @@ func (p Profiler) Start() (func(), error) {
 		}
 	}
 
-	f, err := os.OpenFile(p.Filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	f, err := os.OpenFile(p.Filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("cpuprofiler.Start: %w", err)
 	}
