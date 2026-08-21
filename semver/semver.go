@@ -8,14 +8,12 @@
 package semver
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
-	"unsafe"
 )
 
 type Version struct {
@@ -135,7 +133,7 @@ func (v *Version) SetPrerelease(segments ...string) error {
 	v.ClearPrerelease()
 
 	for _, segment := range segments {
-		err := parseSegment(unsafe.Slice(unsafe.StringData(segment), len(segment)), &v.Prerelease, false)
+		err := parseSegment(segment, &v.Prerelease, false)
 		if err != nil {
 			return err
 		}
@@ -151,7 +149,7 @@ func (v *Version) SetBuildMetadata(segments ...string) error {
 	v.ClearBuildMetadata()
 
 	for _, segment := range segments {
-		err := parseSegment(unsafe.Slice(unsafe.StringData(segment), len(segment)), &v.BuildMetadata, true)
+		err := parseSegment(segment, &v.BuildMetadata, true)
 		if err != nil {
 			return err
 
@@ -200,46 +198,48 @@ func (v *Version) UnmarshalText(b []byte) error {
 		cursor++
 	}
 
+	s := string(b)
+
 	var err error
 
-	if v.Major, cursor, err = parseNumericIdentifier(b, cursor); err != nil || cursor >= len(b) || b[cursor] != '.' {
+	if v.Major, cursor, err = parseNumericIdentifier(s, cursor); err != nil || cursor >= len(s) || s[cursor] != '.' {
 		return fmt.Errorf("major: %w", err)
 	}
 
 	// Skip delimiting period.
 	cursor++
 
-	if v.Minor, cursor, err = parseNumericIdentifier(b, cursor); err != nil || cursor >= len(b) || b[cursor] != '.' {
+	if v.Minor, cursor, err = parseNumericIdentifier(s, cursor); err != nil || cursor >= len(s) || s[cursor] != '.' {
 		return fmt.Errorf("minor: %w", err)
 	}
 
 	// Skip delimiting period.
 	cursor++
 
-	if v.Patch, cursor, err = parseNumericIdentifier(b, cursor); err != nil {
+	if v.Patch, cursor, err = parseNumericIdentifier(s, cursor); err != nil {
 		return fmt.Errorf("patch: %w", err)
 	}
 
 	// No more information.
-	if len(b[cursor:]) == 0 {
+	if len(s[cursor:]) == 0 {
 		return nil
 	}
 
-	if !(b[cursor] == '-' || b[cursor] == '+') {
-		return fmt.Errorf("expected '+' or '-', got %c: %w", b[cursor], ErrDisallowedLeadingZero)
+	if !(s[cursor] == '-' || s[cursor] == '+') {
+		return fmt.Errorf("expected '+' or '-', got %c: %w", s[cursor], ErrDisallowedLeadingZero)
 	}
 
-	if b[cursor] == '-' {
+	if s[cursor] == '-' {
 		cursor++
 
-		end := bytes.IndexByte(b[cursor:], '+')
+		end := strings.IndexByte(s[cursor:], '+')
 		if end == -1 {
-			end = len(b)
+			end = len(s)
 		} else {
 			end = cursor + end
 		}
 
-		err = parseSegment(b[cursor:end], &v.Prerelease, false)
+		err = parseSegment(s[cursor:end], &v.Prerelease, false)
 		if err != nil {
 			return fmt.Errorf("prerelease: %w", err)
 		}
@@ -248,13 +248,13 @@ func (v *Version) UnmarshalText(b []byte) error {
 	}
 
 	// No more information.
-	if len(b[cursor:]) == 0 {
+	if len(s[cursor:]) == 0 {
 		return nil
 	}
 
-	if b[cursor] == '+' {
+	if s[cursor] == '+' {
 		cursor++
-		err = parseSegment(b[cursor:], &v.BuildMetadata, true)
+		err = parseSegment(s[cursor:], &v.BuildMetadata, true)
 		if err != nil {
 			return fmt.Errorf("metadata: %w", err)
 		}
@@ -263,28 +263,28 @@ func (v *Version) UnmarshalText(b []byte) error {
 	return nil
 }
 
-func parseNumericIdentifier(b []byte, start int) (uint32, int, error) {
+func parseNumericIdentifier(s string, start int) (uint32, int, error) {
 	pos := start
 
-	for pos < len(b) && b[pos] >= '0' && b[pos] <= '9' {
+	for pos < len(s) && s[pos] >= '0' && s[pos] <= '9' {
 		pos++
 	}
 
 	if start == pos {
-		if b[pos] < '0' || b[pos] > '9' {
+		if s[pos] < '0' || s[pos] > '9' {
 			return 0, 0, fmt.Errorf("bad numeric identifier: %w", ErrBadVersionFormat)
 		}
 
 		return 0, 0, fmt.Errorf("no numeric identifier: %w", ErrBadVersionFormat)
 	}
 
-	if len(b[start:pos]) > 1 && b[start:pos][0] == '0' {
+	if len(s[start:pos]) > 1 && s[start:pos][0] == '0' {
 		return 0, 0, fmt.Errorf("bad numeric identifier: %w", ErrDisallowedLeadingZero)
 	}
 
-	v, err := strconv.ParseUint(string(b[start:pos]), 10, 64)
+	v, err := strconv.ParseUint(s[start:pos], 10, 64)
 	if err != nil {
-		return 0, 0, fmt.Errorf("numeric identifier %q: %w", string(b[start:pos]), err)
+		return 0, 0, fmt.Errorf("numeric identifier %q: %w", s[start:pos], err)
 	}
 
 	if v > math.MaxUint32 {
@@ -294,25 +294,23 @@ func parseNumericIdentifier(b []byte, start int) (uint32, int, error) {
 	return uint32(v), pos, nil
 }
 
-func parseSegment(b []byte, target *[]Segment, allowLeadingZeros bool) error {
+func parseSegment(s string, target *[]Segment, allowLeadingZeros bool) error {
 	start := 0
-	for pos := 0; pos <= len(b); pos++ {
-		if pos < len(b) && b[pos] != '.' {
+	for pos := 0; pos <= len(s); pos++ {
+		if pos < len(s) && s[pos] != '.' {
 			continue
 		}
 
-		data := b[start:pos]
+		text := s[start:pos]
 
-		if len(data) == 0 {
+		if len(text) == 0 {
 			return fmt.Errorf("no data: %w", ErrBadVersionFormat)
 		}
 
-		isNumeric, err := validateSegment(data, allowLeadingZeros)
+		isNumeric, err := validateSegment(text, allowLeadingZeros)
 		if err != nil && !errors.Is(err, ErrDisallowedLeadingZero) {
 			return err
 		}
-
-		text := string(data)
 
 		var n uint64
 
@@ -343,20 +341,20 @@ func isValidByte(c byte) bool {
 }
 
 // validateSegment validates the data segment and returns whether it's numeric is not.
-func validateSegment(b []byte, allowLeadingZeros bool) (bool, error) {
+func validateSegment(s string, allowLeadingZeros bool) (bool, error) {
 	isNumeric := true
 
-	for _, c := range b {
-		if !isValidByte(c) {
-			return false, fmt.Errorf("invalid character %#U in data segment: %w", c, ErrBadVersionFormat)
+	for i := 0; i < len(s); i++ {
+		if !isValidByte(s[i]) {
+			return false, fmt.Errorf("invalid character %#U in data segment: %w", s[i], ErrBadVersionFormat)
 		}
 
-		if c < '0' || c > '9' {
+		if s[i] < '0' || s[i] > '9' {
 			isNumeric = false
 		}
 	}
 
-	if !allowLeadingZeros && isNumeric && len(b) > 1 && b[0] == '0' {
+	if !allowLeadingZeros && isNumeric && len(s) > 1 && s[0] == '0' {
 		return false, fmt.Errorf("invalid numeric segment: %w", ErrDisallowedLeadingZero)
 	}
 
