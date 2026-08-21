@@ -146,7 +146,7 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 func revToBranch(ctx context.Context, repo *git.Repository, rev plumbing.Revision, remote *git.Remote) (map[string]struct{}, error) {
 	hash, err := repo.ResolveRevision(rev)
 	if err != nil {
-		return nil, fmt.Errorf("revToBranch: bad revision: %w", err)
+		return nil, fmt.Errorf("invalid revision: %w", err)
 	}
 
 	var refs []*plumbing.Reference
@@ -155,7 +155,7 @@ func revToBranch(ctx context.Context, repo *git.Repository, rev plumbing.Revisio
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("revToBranch: list remote refs: %w", err)
+		return nil, fmt.Errorf("list remote refs: %w", err)
 	}
 
 	var realRef *plumbing.Reference
@@ -215,7 +215,7 @@ func toBaseName(rev plumbing.Revision) string {
 	var name string
 
 	for _, rule := range plumbing.RefRevParseRules[1:] {
-		_, err := fmt.Sscanf(rev.String(), rule, &name)
+		_, err := fmt.Sscanf(s, rule, &name)
 		if err != nil {
 			continue
 		}
