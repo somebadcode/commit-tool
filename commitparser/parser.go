@@ -25,7 +25,6 @@ type parser struct {
 	start  int
 	pos    int
 	size   int
-	char   rune
 }
 
 var (

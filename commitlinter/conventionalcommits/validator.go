@@ -68,7 +68,7 @@ func (v *Validator) ValidateSubject(msg commitparser.CommitMessage, _ *object.Co
 		return fmt.Errorf("subject must not be empty: %w", ErrInvalidSubject)
 	}
 
-	first, size := utf8.DecodeRuneInString(msg.Subject)
+	first, _ := utf8.DecodeRuneInString(msg.Subject)
 	if first == utf8.RuneError {
 		return fmt.Errorf("bad subject: %w", ErrInvalidCharacter)
 	}
@@ -81,9 +81,7 @@ func (v *Validator) ValidateSubject(msg commitparser.CommitMessage, _ *object.Co
 		return fmt.Errorf("subject must not start with upper case %q: %w", msg.Subject, ErrInvalidCharacter)
 	}
 
-	var last rune
-
-	last, size = utf8.DecodeLastRuneInString(msg.Subject)
+	last, size := utf8.DecodeLastRuneInString(msg.Subject)
 	if last == utf8.RuneError && size == 1 {
 		return fmt.Errorf("bad subject: %w", ErrInvalidCharacter)
 	}
