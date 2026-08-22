@@ -18,10 +18,13 @@ check: prerequisites mod
 	@go vet ./...
 
 	@echo '==== Static check:'
-	@go tool -modfile=go.tool.mod staticcheck
+	@go tool -modfile=go.tool.mod staticcheck ./...
 
-	@echo '==== Vulnerability check'
-	@go tool -modfile=go.tool.mod govulncheck
+	@echo '==== Vulnerability check:'
+	@go tool -modfile=go.tool.mod govulncheck ./...
+
+	@echo '==== Security check:'
+	@go tool -modfile=go.tool.mod gosec ./...
 
 mod:
 	@echo '==== Downloading dependencies:'
@@ -34,8 +37,9 @@ mod:
 
 mod-tool:
 	@echo '==== Installing tooling:'
-	@go get -u -tool -modfile=go.tool.mod honnef.co/go/tools/cmd/staticcheck
-	@go get -u -tool -modfile=go.tool.mod golang.org/x/vuln/cmd/govulncheck
+	@go get -u -tool -modfile=go.tool.mod honnef.co/go/tools/cmd/staticcheck@v0.8.0
+	@go get -u -tool -modfile=go.tool.mod golang.org/x/vuln/cmd/govulncheck@v1.7.0
+	@go get -u -tool -modfile=go.tool.mod github.com/securego/gosec/v2/cmd/gosec@v2.28.0
 
 clean:
 	@rm -rf dist/
