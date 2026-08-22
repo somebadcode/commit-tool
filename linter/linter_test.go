@@ -129,12 +129,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, err := repobuilder.Build(tt.repoOps...)
-			if err != nil {
-				t.Errorf("failed to build repo: %v", err)
-
-				return
-			}
+			repo := repobuilder.BuildTestHelper(t, t.TempDir(), tt.repoOps...)
 
 			l := &linter.Linter{
 				Repo:         repo,
@@ -148,7 +143,7 @@ func TestCommitLinter_Lint(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			if err = l.Run(ctx); (err != nil) != tt.wantErr {
+			if err := l.Run(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 
 				if lintError, ok := errors.AsType[linter.LintError](err); ok {

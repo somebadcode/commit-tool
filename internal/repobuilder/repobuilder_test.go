@@ -9,6 +9,7 @@ package repobuilder_test
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -25,7 +26,19 @@ func ExampleBuild() {
 		},
 	}
 
-	repo, err := repobuilder.Build(
+	p, err := os.MkdirTemp("", "example")
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		_ = os.RemoveAll(p)
+	}()
+
+	var repo *git.Repository
+	var closeFunc repobuilder.CloseFunc
+
+	repo, closeFunc, err = repobuilder.Build(p,
 		repobuilder.Commit("initial commit", commitOpts),
 		repobuilder.Tag("0.1.0", &git.CreateTagOptions{
 			Tagger:  commitOpts.Author,
@@ -40,6 +53,10 @@ func ExampleBuild() {
 		// Do not panic!
 		panic(err)
 	}
+
+	defer func() {
+		_ = closeFunc()
+	}()
 
 	var iter object.CommitIter
 	iter, err = repo.Log(&git.LogOptions{

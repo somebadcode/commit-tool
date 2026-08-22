@@ -22,17 +22,6 @@ import (
 	"codeberg.org/somebadcode/commit-tool/semver"
 )
 
-func buildRepo(tb testing.TB, operations ...repobuilder.OperationFunc) *git.Repository {
-	tb.Helper()
-
-	repo, err := repobuilder.Build(operations...)
-	if err != nil {
-		tb.Fatalf("could not build repository: %v", err)
-	}
-
-	return repo
-}
-
 func TestNextVersion_ComputeNextVersion(t *testing.T) {
 	type fields struct {
 		Logger           *slog.Logger
@@ -61,7 +50,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 	}{
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 				),
@@ -72,7 +61,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("14.1.4", &git.CreateTagOptions{
@@ -90,7 +79,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
@@ -104,7 +93,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
@@ -123,7 +112,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
@@ -146,7 +135,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1", nil),
@@ -161,7 +150,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("0.1.1-rc.1", nil),
@@ -176,7 +165,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.0.0-rc.1", nil),
@@ -190,7 +179,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.3.0", nil),
@@ -205,7 +194,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.3.0", nil),
@@ -221,7 +210,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("not-semver", nil),
@@ -237,7 +226,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("not-semver", &git.CreateTagOptions{
@@ -256,7 +245,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.0.1-beta.1", nil),
@@ -269,7 +258,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.0.1-beta.1", nil),
@@ -289,7 +278,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Tag("1.0.1", nil),
@@ -304,7 +293,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Commit("chore: bad comment grammar", commitOpts),
@@ -315,7 +304,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Commit("chore: bad comment grammar", commitOpts),
@@ -326,7 +315,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Commit("chore: bad comment grammar", commitOpts),
@@ -337,7 +326,7 @@ func TestNextVersion_ComputeNextVersion(t *testing.T) {
 		},
 		{
 			fields: fields{
-				Repository: buildRepo(t,
+				Repository: repobuilder.BuildTestHelper(t, t.TempDir(),
 					repobuilder.Commit("feat: initial commit", commitOpts),
 					repobuilder.Commit("fix: prevent panic", commitOpts),
 					repobuilder.Commit("chore: bad comment grammar", commitOpts),

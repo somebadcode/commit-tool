@@ -9,10 +9,12 @@ package repobuilder
 
 import (
 	"fmt"
+	"io"
+	"testing"
 	"time"
 
 	"github.com/go-git/go-billy/v5"
-	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/cache"
@@ -20,14 +22,33 @@ import (
 )
 
 type OperationFunc func(repo *git.Repository, tree *git.Worktree) error
+type CloseFunc func() error
 
 const DefaultBranchName = "main"
 
-func Build(ops ...OperationFunc) (*git.Repository, error) {
-	repo, err := build(memfs.New(), DefaultBranchName)
+func Build(p string, ops ...OperationFunc) (*git.Repository, CloseFunc, error) {
+	repo, err := build(osfs.New(p, osfs.WithBoundOS()), DefaultBranchName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	closeFunc := func() error {
+		// TODO: In `go-git/go-git/v6`, replace this with calling `Close() error` on the repository directly.
+		if c, ok := repo.Storer.(io.Closer); ok {
+			return c.Close()
+		}
+
+		return nil
+	}
+
+	defer func() {
+		e := recover()
+		if e != nil {
+			_ = closeFunc()
+
+			panic(e)
+		}
+	}()
 
 	var tree *git.Worktree
 	tree, err = repo.Worktree()
@@ -38,11 +59,28 @@ func Build(ops ...OperationFunc) (*git.Repository, error) {
 	// Build repository.
 	for _, op := range ops {
 		if err = op(repo, tree); err != nil {
-			return repo, err
+			_ = closeFunc()
+
+			return nil, nil, err
 		}
 	}
 
-	return repo, nil
+	return repo, closeFunc, nil
+}
+
+func BuildTestHelper(tb testing.TB, p string, ops ...OperationFunc) *git.Repository {
+	tb.Helper()
+
+	repo, closeFunc, err := Build(p, ops...)
+	if err != nil {
+		tb.Fatalf("failed to build repo: %v", err)
+	}
+
+	tb.Cleanup(func() {
+		_ = closeFunc()
+	})
+
+	return repo
 }
 
 func build(worktree billy.Filesystem, defaultBranch string) (*git.Repository, error) {
@@ -59,6 +97,8 @@ func build(worktree billy.Filesystem, defaultBranch string) (*git.Repository, er
 		DefaultBranch: plumbing.NewBranchReferenceName(defaultBranch),
 	})
 	if err != nil {
+		_ = storage.Close()
+
 		return nil, fmt.Errorf("failed to initialise repository: %w", err)
 	}
 
