@@ -13,8 +13,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-
-	"codeberg.org/somebadcode/commit-tool/internal/revtype"
 )
 
 type Config struct {
@@ -41,12 +39,14 @@ func (c *Config) Validate(repo *git.Repository) error {
 		return fmt.Errorf("reconcile: resolve source revision(%s): %w", c.SourceRevision, err)
 	}
 
-	if revtype.TypeOf(c.SourceRevision) != revtype.TypeBranch {
+	refName := expandRevision(c.SourceRevision)
+	if !(refName.IsBranch() || refName.IsTag()) && refName != plumbing.HEAD {
 		return fmt.Errorf("reconcile: source revision (%s) is not a branch: %w", c.SourceRevision, ErrReconcileOnlyBranches)
 	}
 
 	for _, target := range c.TargetRevisions {
-		if revtype.TypeOf(target) != revtype.TypeBranch {
+		refName = expandRevision(target)
+		if !(refName.IsBranch() || refName.IsTag()) {
 			return fmt.Errorf("reconcile: target revision (%s) is not a branch: %w", target, ErrReconcileOnlyBranches)
 		}
 	}

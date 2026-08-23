@@ -17,6 +17,8 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"codeberg.org/somebadcode/commit-tool/internal/set"
 )
 
 const depthIncrementalFactor = 4
@@ -24,13 +26,12 @@ const maxDepth = 1000
 
 var (
 	ErrCannotReconcile     = errors.New("cannot reconcile revisions")
-	ErrBadRevision         = errors.New("bad revision")
 	ErrUnsupportedRevision = errors.New("unsupported revision")
 )
 
 func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.Commit, error) {
 	if err := c.Validate(repo); err != nil {
-		return nil, fmt.Errorf("reconcile: validation: %w", err)
+		return nil, err
 	}
 
 	remote, err := repo.Remote(c.RemoteName)
@@ -38,15 +39,28 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 		return nil, fmt.Errorf("reconcile: bad remote %q: %w", c.RemoteName, err)
 	}
 
-	var branches map[string]struct{}
+	names := set.New[plumbing.ReferenceName]()
 
-	branches, err = revToBranch(ctx, repo, c.SourceRevision, remote)
-	if err != nil {
-		return nil, fmt.Errorf("reconcile: %w", err)
+	ref := expandRevision(c.SourceRevision)
+	if ref == plumbing.HEAD {
+		var headRef *plumbing.Reference
+		if headRef, err = repo.Head(); err != nil {
+			return nil, fmt.Errorf("reconcile: HEAD: %w", err)
+		}
+
+		names.Add(headRef.Name())
+
+	} else if ref.IsBranch() || ref.IsTag() {
+		names.Add(ref)
+	} else {
+		return nil, fmt.Errorf("reconcile: invalid reference %q: %w", ref, ErrUnsupportedRevision)
 	}
 
 	for _, targetRev := range c.TargetRevisions {
-		branches[toBaseName(targetRev)] = struct{}{}
+		name := expandRevision(targetRev)
+		if name.IsBranch() || name.IsTag() {
+			names.Add(name)
+		}
 	}
 
 	remoteName := remote.Config().Name
@@ -57,10 +71,18 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 
 	refSpecs := make([]config.RefSpec, 0, len(c.TargetRevisions))
 
-	for branch := range branches {
+	for name := range names.Items() {
+		if name.IsTag() {
+			refSpecs = append(refSpecs, config.RefSpec(fmt.Sprintf("+%s:%s",
+				name,
+				name,
+			)))
+
+			continue
+		}
 		refSpecs = append(refSpecs, config.RefSpec(fmt.Sprintf("+%s:%s",
-			plumbing.NewBranchReferenceName(branch),
-			plumbing.NewRemoteReferenceName(remoteName, branch),
+			name,
+			plumbing.NewRemoteReferenceName(remoteName, name.Short()),
 		)))
 	}
 
@@ -99,18 +121,22 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 			return nil, fmt.Errorf("reconcile: resolve source revision(%s) commit: %w", c.SourceRevision, err)
 		}
 
-		mergeBases = mergeBases[:0]
-
 		if len(c.TargetRevisions) > 0 {
 			resolved = true
 		}
 
 		for _, targetRev := range c.TargetRevisions {
-			cleanTarget := toBaseName(targetRev)
-			remoteRefName := plumbing.NewRemoteReferenceName(remoteName, cleanTarget)
+			name := expandRevision(targetRev)
+
+			var resolveRef plumbing.ReferenceName
+			if name.IsTag() {
+				resolveRef = name
+			} else {
+				resolveRef = plumbing.NewRemoteReferenceName(remoteName, name.Short())
+			}
 
 			var targetHash *plumbing.Hash
-			targetHash, err = repo.ResolveRevision(plumbing.Revision(remoteRefName.String()))
+			targetHash, err = repo.ResolveRevision(plumbing.Revision(resolveRef.String()))
 			if err != nil {
 				resolved = false
 				break
@@ -125,7 +151,7 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 
 			var bases []*object.Commit
 			bases, err = sourceCommit.MergeBase(targetCommit)
-			if err != nil || len(mergeBases) == 0 {
+			if err != nil || len(bases) == 0 {
 				resolved = false
 				break
 			}
@@ -143,85 +169,25 @@ func Reconcile(ctx context.Context, repo *git.Repository, c Config) ([]*object.C
 	return mergeBases, nil
 }
 
-func revToBranch(ctx context.Context, repo *git.Repository, rev plumbing.Revision, remote *git.Remote) (map[string]struct{}, error) {
-	hash, err := repo.ResolveRevision(rev)
-	if err != nil {
-		return nil, fmt.Errorf("invalid revision: %w", err)
-	}
-
-	var refs []*plumbing.Reference
-	refs, err = remote.ListContext(ctx, &git.ListOptions{
-		PeelingOption: git.IgnorePeeled,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("list remote refs: %w", err)
-	}
-
-	var realRef *plumbing.Reference
-	for _, ref := range refs {
-		if ref.Hash() == *hash {
-			realRef = ref
-			break
-		}
-	}
-
-	if realRef == nil {
-		return nil, fmt.Errorf("revToBranch: revision %s not found: %w", rev.String(), ErrBadRevision)
-	}
-
-	refSet := make(map[plumbing.Hash]plumbing.ReferenceName, len(refs))
-	for _, ref := range refs {
-		if ref.Name().IsBranch() {
-			refSet[ref.Hash()] = ref.Name()
-		}
-	}
-
-	if realRef.Name().IsBranch() {
-		shortName := realRef.Name().Short()
-		return map[string]struct{}{
-			shortName: {},
-		}, nil
-	}
-
-	var headCommit *object.Commit
-	headCommit, err = repo.CommitObject(*hash)
-	if err != nil {
-		return nil, fmt.Errorf("revToBranch: cannot read commit: %w", err)
-	}
-
-	branches := make(map[string]struct{})
-
-	for _, parent := range headCommit.ParentHashes {
-		if branchName, found := refSet[parent]; found {
-			branches[branchName.Short()] = struct{}{}
-		}
-	}
-
-	if len(branches) == 0 {
-		return nil, fmt.Errorf("resolve: fictitious reference(%s) did not resolve to a known branch: %w", realRef.String(), ErrCannotReconcile)
-	}
-
-	return branches, nil
-}
-
-func toBaseName(rev plumbing.Revision) string {
+func expandRevision(rev plumbing.Revision) plumbing.ReferenceName {
 	s := rev.String()
 
-	if idx := strings.IndexAny(s, "~^:"); idx != -1 {
-		s = s[:idx]
+	if s == "HEAD" {
+		return plumbing.HEAD
 	}
 
-	var name string
+	if strings.HasPrefix(s, "refs/heads/") || strings.HasPrefix(rev.String(), "refs/tags/") {
+		return plumbing.ReferenceName(s)
+	}
 
-	for _, rule := range plumbing.RefRevParseRules[1:] {
-		_, err := fmt.Sscanf(s, rule, &name)
-		if err != nil {
-			continue
+	if after, ok := strings.CutPrefix(s, "refs/remotes/"); ok {
+		clean := after
+		if _, after, ok = strings.Cut(clean, "/"); ok {
+			return plumbing.ReferenceName(after)
 		}
 
-		return name
+		return plumbing.NewBranchReferenceName(clean)
 	}
 
-	return rev.String()
+	return plumbing.NewBranchReferenceName(s)
 }
