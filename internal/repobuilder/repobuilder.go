@@ -8,6 +8,7 @@
 package repobuilder
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -18,16 +19,18 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/cache"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 )
 
-type OperationFunc func(repo *git.Repository, tree *git.Worktree) error
+type OperationFunc func(repo *git.Repository) error
 type CloseFunc func() error
 
 const DefaultBranchName = "main"
 
 func Build(p string, ops ...OperationFunc) (*git.Repository, CloseFunc, error) {
-	repo, err := build(osfs.New(p, osfs.WithBoundOS()), DefaultBranchName)
+	storage := osfs.New(p, osfs.WithBoundOS())
+	repo, err := build(storage, DefaultBranchName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -50,15 +53,20 @@ func Build(p string, ops ...OperationFunc) (*git.Repository, CloseFunc, error) {
 		}
 	}()
 
-	var tree *git.Worktree
-	tree, err = repo.Worktree()
+	headRef := plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName(DefaultBranchName))
+	if err = repo.Storer.SetReference(headRef); err != nil {
+		_ = closeFunc()
+		return nil, nil, fmt.Errorf("failed to initialize symbolic HEAD: %w", err)
+	}
+
+	err = CheckoutBranch(DefaultBranchName)(repo)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
 	// Build repository.
 	for _, op := range ops {
-		if err = op(repo, tree); err != nil {
+		if err = op(repo); err != nil {
 			_ = closeFunc()
 
 			return nil, nil, err
@@ -84,16 +92,9 @@ func BuildTestHelper(tb testing.TB, p string, ops ...OperationFunc) *git.Reposit
 }
 
 func build(worktree billy.Filesystem, defaultBranch string) (*git.Repository, error) {
-	dot, err := worktree.Chroot(git.GitDirName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to chroot dot directory: %w", err)
-	}
+	storage := filesystem.NewStorage(worktree, cache.NewObjectLRUDefault())
 
-	// Create object storage, using dot directory and LRU cache.
-	storage := filesystem.NewStorage(dot, cache.NewObjectLRUDefault())
-
-	var repo *git.Repository
-	repo, err = git.InitWithOptions(storage, worktree, git.InitOptions{
+	repo, err := git.InitWithOptions(storage, nil, git.InitOptions{
 		DefaultBranch: plumbing.NewBranchReferenceName(defaultBranch),
 	})
 	if err != nil {
@@ -105,31 +106,26 @@ func build(worktree billy.Filesystem, defaultBranch string) (*git.Repository, er
 	return repo, nil
 }
 
-func checkoutBranch(repo *git.Repository, name string, worktree *git.Worktree) error {
-	branch, _ := repo.Branch(name)
+func checkoutBranch(repo *git.Repository, name string) error {
+	target := plumbing.NewBranchReferenceName(name)
 
-	opts := git.CheckoutOptions{
-		// Create the branch if it doesn't exist.
-		Create: branch == nil,
-		Branch: plumbing.NewBranchReferenceName(name),
+	if headRef, err := repo.Head(); err == nil {
+		_ = repo.Storer.SetReference(plumbing.NewHashReference(target, headRef.Hash()))
 	}
 
-	err := worktree.Checkout(&opts)
-	if err != nil {
-		return fmt.Errorf("failed to checkout branch %q: %w", opts.Branch, err)
-	}
+	symRef := plumbing.NewSymbolicReference(plumbing.HEAD, target)
 
-	return nil
+	return repo.Storer.SetReference(symRef)
 }
 
 func CheckoutBranch(name string) OperationFunc {
-	return func(repo *git.Repository, worktree *git.Worktree) error {
-		return checkoutBranch(repo, name, worktree)
+	return func(repo *git.Repository) error {
+		return checkoutBranch(repo, name)
 	}
 }
 
 func Commit(message string, options git.CommitOptions) OperationFunc {
-	return func(repo *git.Repository, worktree *git.Worktree) error {
+	return func(repo *git.Repository) error {
 		if err := options.Validate(repo); err != nil {
 			return fmt.Errorf("invalid options: %w", err)
 		}
@@ -138,20 +134,83 @@ func Commit(message string, options git.CommitOptions) OperationFunc {
 			options.Committer.When = time.Now()
 		}
 
-		// Parents can't be nil, it must be empty or tree of commits will not be formed correctly when start from nothing.
-		options.Parents = plumbing.HashSlice{}
+		var treeHash plumbing.Hash
+		var parents []plumbing.Hash
 
-		_, err := worktree.Commit(message, &options)
-		if err != nil {
-			return fmt.Errorf("failed to commit %q: %w", message, err)
+		headRef, err := repo.Head()
+		if err == nil {
+			parents = append(parents, headRef.Hash())
+
+			var currentCommit *object.Commit
+
+			currentCommit, err = repo.CommitObject(headRef.Hash())
+			if err != nil {
+				return fmt.Errorf("failed to get current commit: %w", err)
+			}
+
+			treeHash = currentCommit.TreeHash
+
+		} else if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			emptyTree := new(object.Tree)
+
+			treeObject := repo.Storer.NewEncodedObject()
+			treeObject.SetType(plumbing.TreeObject)
+
+			if err = emptyTree.Encode(treeObject); err != nil {
+				return fmt.Errorf("failed to encode tree: %w", err)
+			}
+
+			treeHash, err = repo.Storer.SetEncodedObject(treeObject)
+			if err != nil {
+				return fmt.Errorf("failed to set encoded object: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get HEAD: %w", err)
 		}
 
-		return nil
+		commit := &object.Commit{
+			TreeHash:     treeHash,
+			ParentHashes: parents,
+			Author:       *options.Author,
+			Committer:    *options.Committer,
+			Message:      message,
+		}
+
+		commitObj := repo.Storer.NewEncodedObject()
+		commitObj.SetType(plumbing.CommitObject)
+		if err = commit.Encode(commitObj); err != nil {
+			return fmt.Errorf("failed to encode commit: %w", err)
+		}
+
+		var commitHash plumbing.Hash
+		commitHash, err = repo.Storer.SetEncodedObject(commitObj)
+		if err != nil {
+			return fmt.Errorf("failed to set encoded commit object: %w", err)
+		}
+
+		var realHeadRef *plumbing.Reference
+		realHeadRef, err = repo.Storer.Reference(plumbing.HEAD)
+		if err != nil {
+			return fmt.Errorf("failed to get HEAD reference: %w", err)
+		}
+
+		if realHeadRef.Type() == plumbing.SymbolicReference {
+			target := realHeadRef.Target()
+
+			branchRef := plumbing.NewHashReference(target, commitHash)
+			if err = repo.Storer.SetReference(branchRef); err != nil {
+				return fmt.Errorf("failed to set branch reference: %w", err)
+			}
+
+			return repo.Storer.SetReference(plumbing.NewHashReference(realHeadRef.Target(), commitHash))
+		}
+
+		return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, commitHash))
 	}
 }
 
 func Tag(tag string, options *git.CreateTagOptions) OperationFunc {
-	return func(repo *git.Repository, worktree *git.Worktree) error {
+	return func(repo *git.Repository) error {
 		head, err := repo.Head()
 		if err != nil {
 			return fmt.Errorf("failed to get HEAD: %w", err)
